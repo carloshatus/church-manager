@@ -10,6 +10,7 @@ import {
   Calendar,
   FileText,
   Info,
+  Search,
 } from 'lucide-react';
 import { useInvoiceFormStore } from '@/stores/use-invoice-form-store';
 import { PhotoUploader } from '@/components/photo/photo-uploader';
@@ -80,7 +81,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <label className="text-sm font-semibold text-white flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
-            Chave de Acesso (44 Dígitos)
+            Chave de Acesso (44 Dígitos) ou URL
           </label>
           <div className="flex items-center gap-2">
             {fields.type !== 'UNKNOWN' && (
@@ -102,8 +103,8 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
             type="text"
             value={fields.accessKey}
             onChange={(e) => setFormField('accessKey', e.target.value)}
-            placeholder="Digite os 44 dígitos ou escaneie o QR Code / Código de barras"
-            maxLength={55}
+            placeholder="Digite os 44 dígitos ou cole a URL / escaneie o QR Code"
+            maxLength={250}
             className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm font-mono text-slate-100 placeholder-slate-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary tracking-wide"
           />
           {cleanKey.length > 0 && cleanKey.length < 44 && (
@@ -112,9 +113,23 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
             </p>
           )}
           {isKeyComplete && (
-            <p className="text-xs text-slate-400 font-mono">
-              Visual: {formatAccessKey(cleanKey)}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+              <p className="text-slate-400 font-mono">
+                Visual: {formatAccessKey(cleanKey)}
+              </p>
+              {isResolvingCnpj && (
+                <span className="text-primary font-medium flex items-center gap-1.5 animate-pulse">
+                  <RotateCw className="w-3 h-3 animate-spin" />
+                  Consultando emitente na Receita Federal...
+                </span>
+              )}
+              {!isResolvingCnpj && fields.issuerName && (
+                <span className="text-emerald-400 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Emitente: {fields.issuerName}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -132,9 +147,23 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* CNPJ */}
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1">
-              CNPJ do Emitente
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-slate-400">
+                CNPJ do Emitente
+              </label>
+              <button
+                type="button"
+                onClick={() => retryResolveCnpj()}
+                disabled={
+                  isResolvingCnpj || fields.issuerCnpj.replace(/\D/g, '').length !== 14
+                }
+                className="text-[11px] text-primary hover:text-primary/80 font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:hover:text-primary transition"
+                title="Consultar dados cadastrais do CNPJ"
+              >
+                <Search className="w-3 h-3" />
+                {isResolvingCnpj ? 'Buscando...' : 'Buscar CNPJ'}
+              </button>
+            </div>
             <input
               type="text"
               value={fields.issuerCnpj}
@@ -182,7 +211,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
             </div>
             <button
               type="button"
-              onClick={retryResolveCnpj}
+              onClick={() => retryResolveCnpj()}
               disabled={isResolvingCnpj}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition flex-shrink-0"
             >

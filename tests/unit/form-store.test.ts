@@ -104,4 +104,62 @@ describe('Form Store: useInvoiceFormStore', () => {
     expect(useInvoiceFormStore.getState().fields.accessKey).toBe('');
     expect(useInvoiceFormStore.getState().lastSavedId).toBe(42);
   });
+
+  it('deve disparar resolução de CNPJ automaticamente ao informar chave de 44 dígitos no accessKey', async () => {
+    vi.spyOn(cnpjService, 'resolveCnpj').mockResolvedValue({
+      cnpj: '12345678000199',
+      razaoSocial: 'Auto Resolvido Por Chave Ltda',
+      provider: 'MinhaReceita',
+    });
+
+    const store = useInvoiceFormStore.getState();
+    store.setFormField('accessKey', sampleKey);
+
+    // Aguarda microtask de resolução
+    await vi.waitFor(() => {
+      expect(useInvoiceFormStore.getState().fields.issuerName).toBe(
+        'Auto Resolvido Por Chave Ltda'
+      );
+    });
+
+    expect(useInvoiceFormStore.getState().cnpjProviderUsed).toBe('MinhaReceita');
+  });
+
+  it('deve aceitar URL de NFC-e colada no campo accessKey e disparar resolução de CNPJ', async () => {
+    vi.spyOn(cnpjService, 'resolveCnpj').mockResolvedValue({
+      cnpj: '12345678000199',
+      razaoSocial: 'Auto Resolvido Por URL Ltda',
+      provider: 'BrasilAPI',
+    });
+
+    const store = useInvoiceFormStore.getState();
+    const nfceUrl = `https://www.fazenda.sp.gov.br/nfce/qrcode?p=${sampleKey}|2|1|1|HASH`;
+    store.setFormField('accessKey', nfceUrl);
+
+    expect(useInvoiceFormStore.getState().fields.accessKey).toBe(sampleKey);
+    expect(useInvoiceFormStore.getState().fields.qrCodeUrl).toBe(nfceUrl);
+
+    await vi.waitFor(() => {
+      expect(useInvoiceFormStore.getState().fields.issuerName).toBe(
+        'Auto Resolvido Por URL Ltda'
+      );
+    });
+  });
+
+  it('deve disparar resolução de CNPJ automaticamente ao digitar 14 dígitos no issuerCnpj', async () => {
+    vi.spyOn(cnpjService, 'resolveCnpj').mockResolvedValue({
+      cnpj: '55166633000166',
+      razaoSocial: 'Beto Bolsas Vitoria da Conquista Ltda',
+      provider: 'MinhaReceita',
+    });
+
+    const store = useInvoiceFormStore.getState();
+    store.setFormField('issuerCnpj', '55166633000166');
+
+    await vi.waitFor(() => {
+      expect(useInvoiceFormStore.getState().fields.issuerName).toBe(
+        'Beto Bolsas Vitoria da Conquista Ltda'
+      );
+    });
+  });
 });

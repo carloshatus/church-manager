@@ -30,6 +30,15 @@ export function formatAccessKey(key: string): string {
 }
 
 /**
+ * Formata um CNPJ de 14 dígitos no padrão 00.000.000/0000-00.
+ */
+export function formatCnpj(cnpj: string): string {
+  const clean = cnpj.replace(/\D/g, '');
+  if (clean.length !== 14) return cnpj;
+  return clean.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+/**
  * Decompõe uma chave de acesso fiscal de 44 dígitos em seus campos padronizados pela SEFAZ.
  */
 export function parseNFeKey(rawKey: string): ParsedKeyData {

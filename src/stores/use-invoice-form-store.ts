@@ -36,7 +36,7 @@ interface InvoiceFormState {
   setScanningModalOpen: (open: boolean) => void;
   setFormField: (field: keyof FormFields, value: string) => void;
   handleScannedData: (rawInput: string) => Promise<void>;
-  retryResolveCnpj: () => Promise<void>;
+  retryResolveCnpj: (overrideCnpj?: string) => Promise<void>;
   handlePhotoSelected: (file: File) => Promise<void>;
   removePhoto: () => void;
   resetForm: () => void;
@@ -74,29 +74,75 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
   },
 
   setFormField: (field, value) => {
+    let cnpjToFetch: string | null = null;
+
     set((state) => {
       const updatedFields = { ...state.fields, [field]: value };
 
-      // Se o usuário alterar a chave de 44 dígitos manualmente, tenta re-parsear
+      // Se o usuário alterar a chave manualmente ou colar uma URL da SEFAZ
       if (field === 'accessKey') {
-        const cleanKey = value.replace(/\D/g, '');
-        if (cleanKey.length === 44) {
+        const trimmed = value.trim();
+
+        // 1. Suporte a colar URL de NFC-e (com parâmetros de SEFAZ)
+        if (/^https?:\/\//i.test(trimmed)) {
           try {
-            const parsed = parseNFeKey(cleanKey);
+            const scanned = parseScannedInput(trimmed);
+            const parsed = parseNFeKey(scanned.accessKey);
+            updatedFields.accessKey = parsed.accessKey;
+            updatedFields.qrCodeUrl = scanned.qrCodeUrl || '';
             updatedFields.type = parsed.type;
             updatedFields.emissionDate = parsed.emissionPeriod;
             updatedFields.issuerCnpj = parsed.cnpj;
             updatedFields.model = parsed.model;
             updatedFields.series = parsed.series;
             updatedFields.number = parsed.number;
+
+            if (parsed.cnpj && parsed.cnpj.length === 14) {
+              cnpjToFetch = parsed.cnpj;
+            }
           } catch {
-            // Ignora se não conseguir decompor
+            // Ignora se for URL incompleta ou inválida
           }
+        } else {
+          // 2. Chave de 44 dígitos digitada ou colada
+          const cleanKey = trimmed.replace(/\D/g, '');
+          if (cleanKey.length === 44) {
+            try {
+              const parsed = parseNFeKey(cleanKey);
+              updatedFields.type = parsed.type;
+              updatedFields.emissionDate = parsed.emissionPeriod;
+              updatedFields.issuerCnpj = parsed.cnpj;
+              updatedFields.model = parsed.model;
+              updatedFields.series = parsed.series;
+              updatedFields.number = parsed.number;
+
+              if (parsed.cnpj && parsed.cnpj.length === 14) {
+                cnpjToFetch = parsed.cnpj;
+              }
+            } catch {
+              // Ignora se não conseguir decompor
+            }
+          }
+        }
+      }
+
+      // Se o usuário digitar ou colar o CNPJ diretamente (14 dígitos)
+      if (field === 'issuerCnpj') {
+        const cleanCnpj = value.replace(/\D/g, '');
+        if (
+          cleanCnpj.length === 14 &&
+          cleanCnpj !== state.fields.issuerCnpj.replace(/\D/g, '')
+        ) {
+          cnpjToFetch = cleanCnpj;
         }
       }
 
       return { fields: updatedFields };
     });
+
+    if (cnpjToFetch) {
+      void get().retryResolveCnpj(cnpjToFetch);
+    }
   },
 
   handleScannedData: async (rawInput: string) => {
@@ -124,7 +170,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       }));
 
       // 3. Dispara a consulta assíncrona ao CNPJ
-      await get().retryResolveCnpj();
+      await get().retryResolveCnpj(parsedKey.cnpj);
     } catch (err: unknown) {
       set({
         formError: (err as Error)?.message || 'Erro ao processar dados',
@@ -133,9 +179,9 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
     }
   },
 
-  retryResolveCnpj: async () => {
-    const { issuerCnpj } = get().fields;
-    const cleanCnpj = issuerCnpj.replace(/\D/g, '');
+  retryResolveCnpj: async (overrideCnpj?: string) => {
+    const rawCnpj = overrideCnpj || get().fields.issuerCnpj;
+    const cleanCnpj = rawCnpj.replace(/\D/g, '');
     if (!cleanCnpj || cleanCnpj.length !== 14) return;
 
     set({ isResolvingCnpj: true, cnpjError: null });
