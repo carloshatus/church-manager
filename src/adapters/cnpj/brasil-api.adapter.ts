@@ -34,8 +34,8 @@ export class BrasilApiAdapter implements ICnpjProvider {
       const response = await this.fetchFn(`${this.baseUrl}/${cleanCnpj}`, {
         signal: controller.signal,
         headers: {
-          Accept: 'application/json'
-        }
+          Accept: 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -52,11 +52,13 @@ export class BrasilApiAdapter implements ICnpjProvider {
         municipio: data.municipio,
         cnaeFiscalDescricao: data.cnae_fiscal_descricao,
         status: data.descricao_situacao_cadastral,
-        provider: 'BrasilAPI'
+        provider: 'BrasilAPI',
       };
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error(`Timeout na consulta à BrasilAPI (${this.timeoutMs}ms)`);
+    } catch (error: unknown) {
+      if ((error as Error).name === 'AbortError') {
+        throw new Error(`Timeout na consulta à BrasilAPI (${this.timeoutMs}ms)`, {
+          cause: error,
+        });
       }
       throw error;
     } finally {

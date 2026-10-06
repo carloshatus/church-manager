@@ -19,7 +19,10 @@ Este diretório contém o detalhamento técnico completo para a construção do 
 7. [06 - Plano de Verificação, Testes & Garantia de Qualidade](./06-verification-and-testing-plan.md)
    - Testes unitários com Vitest, simulação offline, validação de câmera e roteiro de testes manuais.
 8. [07 - Roteiro de Implementação em Etapas (Milestones & Checkpoints)](./07-staged-implementation-roadmap.md)
-   - Divisão do desenvolvimento em 7 etapas incrementais com critérios de aceite (DoD) e guia de pausa/retomada segura.
+   - Divisão do desenvolvimento do Módulo 1 em 7 etapas incrementais com critérios de aceite (DoD) e guia de pausa/retomada segura.
+9. [08 - Roteiro das Próximas Fases (Roadmap de Evolução)](./08-next-phases-roadmap.md)
+   - Planejamento arquitetural das Fases 8 a 11: Motor de Sincronização Remota (Cloud Sync), Web Scraping SEFAZ & OCR, Centros de Custo (PDF/Excel) e Multi-Congregação/RBAC.
 
 ---
 *Gerado a partir das especificações de `prompts/plan.md`.*
+

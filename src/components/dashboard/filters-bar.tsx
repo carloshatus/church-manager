@@ -42,9 +42,7 @@ export const FiltersBar: React.FC<FiltersBarProps> = ({
           <input
             type="text"
             value={filters.searchTerm}
-            onChange={(e) =>
-              onFilterChange({ ...filters, searchTerm: e.target.value })
-            }
+            onChange={(e) => onFilterChange({ ...filters, searchTerm: e.target.value })}
             placeholder="Buscar por Razão Social, CNPJ ou chave de 44 dígitos..."
             className="w-full rounded-xl border border-slate-800 bg-slate-900/80 pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-primary focus:outline-none"
           />

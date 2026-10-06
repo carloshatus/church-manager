@@ -9,7 +9,7 @@ import {
   Building2,
   Calendar,
   FileText,
-  Info
+  Info,
 } from 'lucide-react';
 import { useInvoiceFormStore } from '@/stores/use-invoice-form-store';
 import { PhotoUploader } from '@/components/photo/photo-uploader';
@@ -126,9 +126,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
             <Building2 className="w-4 h-4 text-primary" />
             Dados do Emitente (Estabelecimento)
           </h3>
-          {cnpjProviderUsed && (
-            <StatusBadge type="provider" value={cnpjProviderUsed} />
-          )}
+          {cnpjProviderUsed && <StatusBadge type="provider" value={cnpjProviderUsed} />}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -158,7 +156,11 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
                 type="text"
                 value={fields.issuerName}
                 onChange={(e) => setFormField('issuerName', e.target.value)}
-                placeholder={isResolvingCnpj ? 'Consultando provedores de CNPJ...' : 'Razão Social ou Nome do Estabelecimento'}
+                placeholder={
+                  isResolvingCnpj
+                    ? 'Consultando provedores de CNPJ...'
+                    : 'Razão Social ou Nome do Estabelecimento'
+                }
                 disabled={isResolvingCnpj}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-primary focus:outline-none disabled:opacity-60"
               />
@@ -184,7 +186,9 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
               disabled={isResolvingCnpj}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition flex-shrink-0"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${isResolvingCnpj ? 'animate-spin' : ''}`} />
+              <RotateCw
+                className={`w-3.5 h-3.5 ${isResolvingCnpj ? 'animate-spin' : ''}`}
+              />
               Tentar Novamente (Retry)
             </button>
           </div>
@@ -213,9 +217,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1">
-              Série
-            </label>
+            <label className="text-xs font-medium text-slate-400 block mb-1">Série</label>
             <input
               type="text"
               value={fields.series}

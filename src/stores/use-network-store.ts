@@ -18,5 +18,5 @@ export const useNetworkStore = create<NetworkState>((set) => ({
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }
+  },
 }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Invoice } from '@/domain/entities/invoice';
 import { StatusBadge } from './status-badge';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
@@ -16,22 +16,20 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
   onDelete,
   onViewDetails,
 }) => {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  useEffect(() => {
-    if (!invoice.imageBlob) {
-      setThumbnailUrl(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(invoice.imageBlob);
-    setThumbnailUrl(url);
-
-    return () => {
-      URL.revokeObjectURL(url);
-    };
+  const thumbnailUrl = useMemo(() => {
+    if (!invoice.imageBlob) return null;
+    return URL.createObjectURL(invoice.imageBlob);
   }, [invoice.imageBlob]);
+
+  useEffect(() => {
+    return () => {
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+    };
+  }, [thumbnailUrl]);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 hover:border-slate-700 transition flex flex-col justify-between gap-4 group">
@@ -51,9 +49,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
               {invoice.issuerName || 'Razão Social não informada'}
             </span>
           </h3>
-          <p className="text-xs text-slate-400 font-mono">
-            CNPJ: {invoice.issuerCnpj}
-          </p>
+          <p className="text-xs text-slate-400 font-mono">CNPJ: {invoice.issuerCnpj}</p>
         </div>
 
         {/* Thumbnail da foto anexada */}
@@ -99,7 +95,8 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
           )}
           {invoice.totalAmount !== undefined && (
             <span className="font-semibold text-emerald-400 flex items-center gap-0.5 text-sm">
-              R$ {invoice.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R${' '}
+              {invoice.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
           )}
         </div>

@@ -209,22 +209,90 @@ O desenvolvimento está estruturado em 7 etapas incrementais. Cada etapa possui 
    ```
    Acesse a aplicação no navegador em: `http://localhost:5173/`
 
-4. **Compilar para Produção (Build PWA)**:
+4. **Executar Testes Automatizados**:
+   ```bash
+   npm run test
+   ```
+
+5. **Compilar para Produção (Build PWA)**:
    ```bash
    npm run build
    ```
    O bundle otimizado e os arquivos de Service Worker (`sw.js` e `workbox-*.js`) serão gerados na pasta `dist/`.
 
-5. **Visualizar o Build de Produção Localmente**:
+6. **Visualizar o Build de Produção Localmente**:
    ```bash
    npm run preview
    ```
 
 ---
 
+## 📐 Padrões de Código & Qualidade (Code Standards)
+
+O projeto adota regras rigorosas de tipagem estrita, arquitetura limpa e estilo de código automatizado por **ESLint 9 Flat Config** e **Prettier**.
+
+Para detalhes arquiteturais, padrões de nomenclatura, regras de armazenamento offline e convenções de commit, consulte o guia completo em [docs/CODE_STANDARD.md](docs/CODE_STANDARD.md).
+
+### Comandos de Verificação & Formatação:
+
+```bash
+# Executar análise estática de código (ESLint)
+npm run lint
+
+# Corrigir automaticamente avisos e problemas corrigíveis
+npm run lint:fix
+
+# Formatar todos os arquivos do projeto com Prettier
+npm run format
+
+# Verificar se todos os arquivos estão formatados corretamente
+npm run format:check
+```
+
+---
+
+## 🌐 Deploy no GitHub Pages (CI/CD Automatizado)
+
+O projeto está configurado para deploy contínuo no **GitHub Pages** por meio do GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)).
+
+A cada `push` na branch `main`, a pipeline:
+1. Executa a validação estática de código (`npm run lint`).
+2. Roda a suíte completa de testes unitários (`npm run test`).
+3. Compila a aplicação com o base path apropriado (`npm run build`).
+4. Cria o fallback `404.html` para suporte a rotas SPA no GitHub Pages.
+5. Realiza o deploy seguro no GitHub Pages via `actions/deploy-pages@v4`.
+
+### Como ativar o GitHub Pages no seu repositório:
+1. Acesse o repositório no GitHub: `https://github.com/carloshatus/church-manager`
+2. Vá em **Settings** > **Pages** (no menu lateral esquerdo).
+3. Na seção **Build and deployment** > **Source**, selecione: **GitHub Actions**.
+4. Pronto! O workflow será acionado automaticamente a cada commit na `main`.
+
+A aplicação ficará disponível publicamente em:
+👉 **`https://carloshatus.github.io/church-manager/`**
+
+---
+
+## 🔮 Próximas Fases (Roadmap de Evolução)
+
+Após a conclusão das 7 etapas fundamentais do Módulo 1, o roadmap estabelece as seguintes frentes de expansão:
+
+- **Fase 8: Motor de Sincronização Remota (Cloud Sync Engine)**
+  - Sincronização bidirecional em segundo plano (`ISyncAdapter`), fila com retry exponencial, envio de comprovantes para bucket em nuvem (S3/Supabase/R2) e resolução de conflitos.
+- **Fase 9: Web Scraping SEFAZ & OCR de Comprovantes**
+  - Implementação concreta do `ISefazScraper` para extração de itens, quantidades, valores e tributos a partir do `qrCodeUrl`, além de OCR para recibos físicos sem QR Code.
+- **Fase 10: Centros de Custo & Prestação de Contas (PDF/Excel)**
+  - Classificação por ministérios e congregações, tetos orçamentários, e exportação de balancetes em PDF formatado (com miniaturas dos comprovantes) e planilhas Excel para auditoria fiscal.
+- **Fase 11: Multi-Congregação & Controle de Acesso (RBAC)**
+  - Suporte a rede de igrejas (sede e filiais), autenticação segura e permissões por perfil (Voluntário, Líder, Tesoureiro, Auditor).
+
+Consulte o documento completo: [plans/08-next-phases-roadmap.md](plans/08-next-phases-roadmap.md).
+
+---
+
 ## 📚 Documentação Técnica Detalhada
 
-Para consultar as especificações completas de cada aspecto do projeto, acesse os arquivos no diretório [`plans/`](file:///home/carloshatus/Hatus/church-manager/plans/):
+Para consultar as especificações completas de cada aspecto do projeto, acesse os arquivos no diretório [`plans/`](plans/):
 
 - [00 - Arquitetura Geral & Visão do Sistema](plans/00-overview-and-architecture.md)
 - [01 - Setup Inicial & Ferramental (Tooling)](plans/01-setup-and-tooling.md)
@@ -234,8 +302,11 @@ Para consultar as especificações completas de cada aspecto do projeto, acesse 
 - [05 - Gerenciamento de Estado & Hierarquia de Componentes UI](plans/05-state-and-ui-components.md)
 - [06 - Plano de Verificação, Testes & Garantia de Qualidade](plans/06-verification-and-testing-plan.md)
 - [07 - Roteiro de Implementação em Etapas (Checkpoints)](plans/07-staged-implementation-roadmap.md)
+- [08 - Roteiro das Próximas Fases (Roadmap de Evolução)](plans/08-next-phases-roadmap.md)
+- [Guia de Padrões de Código (Code Standards)](docs/CODE_STANDARD.md)
 
 ---
 
 ## 📄 Licença
 Distribuído sob a licença MIT. Consulte o arquivo `LICENSE` para obter mais informações.
+

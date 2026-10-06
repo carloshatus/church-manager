@@ -17,8 +17,8 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
         nome_fantasia: 'Livraria Central',
         uf: 'SP',
         municipio: 'São Paulo',
-        descricao_situacao_cadastral: 'ATIVA'
-      })
+        descricao_situacao_cadastral: 'ATIVA',
+      }),
     });
 
     const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as any);
@@ -35,11 +35,13 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
   it('BrasilApiAdapter deve lançar erro se o status HTTP não for OK', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
-      status: 404
+      status: 404,
     });
 
     const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as any);
-    await expect(adapter.fetchByCnpj(sampleCnpj)).rejects.toThrow('BrasilAPI retornou status HTTP 404');
+    await expect(adapter.fetchByCnpj(sampleCnpj)).rejects.toThrow(
+      'BrasilAPI retornou status HTTP 404'
+    );
   });
 
   it('MinhaReceitaAdapter deve normalizar resposta de sucesso', async () => {
@@ -50,11 +52,15 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
         cnpj: '12345678000199',
         razao_social: 'Livraria e Papelaria Central - Minha Receita',
         uf: 'SP',
-        municipio: 'São Paulo'
-      })
+        municipio: 'São Paulo',
+      }),
     });
 
-    const adapter = new MinhaReceitaAdapter('https://fake-minha-receita', 5000, mockFetch as any);
+    const adapter = new MinhaReceitaAdapter(
+      'https://fake-minha-receita',
+      5000,
+      mockFetch as any
+    );
     const result = await adapter.fetchByCnpj(sampleCnpj);
 
     expect(result.cnpj).toBe('12345678000199');
@@ -72,11 +78,11 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
   beforeEach(() => {
     primaryMock = {
       name: 'BrasilAPI',
-      fetchByCnpj: vi.fn()
+      fetchByCnpj: vi.fn(),
     };
     fallbackMock = {
       name: 'MinhaReceita',
-      fetchByCnpj: vi.fn()
+      fetchByCnpj: vi.fn(),
     };
   });
 
@@ -84,7 +90,7 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     const primaryData: CnpjDto = {
       cnpj: sampleCnpj,
       razaoSocial: 'Empresa Principal Ltda',
-      provider: 'BrasilAPI'
+      provider: 'BrasilAPI',
     };
 
     (primaryMock.fetchByCnpj as any).mockResolvedValue(primaryData);
@@ -101,7 +107,7 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     const fallbackData: CnpjDto = {
       cnpj: sampleCnpj,
       razaoSocial: 'Empresa Salva Pelo Fallback Ltda',
-      provider: 'MinhaReceita'
+      provider: 'MinhaReceita',
     };
 
     // BrasilAPI falha
@@ -132,7 +138,7 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     const data: CnpjDto = {
       cnpj: sampleCnpj,
       razaoSocial: 'Supermercado Cacheado Ltda',
-      provider: 'BrasilAPI'
+      provider: 'BrasilAPI',
     };
 
     (primaryMock.fetchByCnpj as any).mockResolvedValue(data);
@@ -159,7 +165,9 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
   it('deve validar o formato do CNPJ e rejeitar entradas que não contenham 14 dígitos', async () => {
     const service = new CnpjService([primaryMock, fallbackMock]);
 
-    await expect(service.resolveCnpj('12345')).rejects.toThrow('CNPJ deve conter 14 dígitos numéricos');
+    await expect(service.resolveCnpj('12345')).rejects.toThrow(
+      'CNPJ deve conter 14 dígitos numéricos'
+    );
     expect(primaryMock.fetchByCnpj).not.toHaveBeenCalled();
   });
 });

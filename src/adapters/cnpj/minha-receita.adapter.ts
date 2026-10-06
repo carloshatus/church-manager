@@ -16,11 +16,7 @@ export class MinhaReceitaAdapter implements ICnpjProvider {
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
 
-  constructor(
-    baseUrl = 'https://minhareceita.org',
-    timeoutMs = 7000,
-    fetchFn = fetch
-  ) {
+  constructor(baseUrl = 'https://minhareceita.org', timeoutMs = 7000, fetchFn = fetch) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.fetchFn = fetchFn;
@@ -34,8 +30,8 @@ export class MinhaReceitaAdapter implements ICnpjProvider {
       const response = await this.fetchFn(`${this.baseUrl}/${cleanCnpj}`, {
         signal: controller.signal,
         headers: {
-          Accept: 'application/json'
-        }
+          Accept: 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -52,11 +48,13 @@ export class MinhaReceitaAdapter implements ICnpjProvider {
         municipio: data.municipio,
         cnaeFiscalDescricao: data.cnae_fiscal_descricao,
         status: data.descricao_situacao_cadastral,
-        provider: 'MinhaReceita'
+        provider: 'MinhaReceita',
       };
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error(`Timeout na consulta à Minha Receita (${this.timeoutMs}ms)`);
+    } catch (error: unknown) {
+      if ((error as Error).name === 'AbortError') {
+        throw new Error(`Timeout na consulta à Minha Receita (${this.timeoutMs}ms)`, {
+          cause: error,
+        });
       }
       throw error;
     } finally {

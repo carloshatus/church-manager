@@ -7,12 +7,8 @@ export const PhotoUploader: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const {
-    imagePreviewUrl,
-    isCompressingPhoto,
-    handlePhotoSelected,
-    removePhoto,
-  } = useInvoiceFormStore();
+  const { imagePreviewUrl, isCompressingPhoto, handlePhotoSelected, removePhoto } =
+    useInvoiceFormStore();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -9,7 +9,9 @@ export class DexieInvoiceRepository implements IInvoiceRepository {
     this.database = database;
   }
 
-  async create(invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
+  async create(
+    invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<number> {
     const now = Date.now();
     const invoice: Invoice = {
       ...invoiceData,
@@ -45,7 +47,10 @@ export class DexieInvoiceRepository implements IInvoiceRepository {
   }
 
   async listPendingSync(): Promise<Invoice[]> {
-    return await this.database.invoices.where('syncStatus').equals('PENDING_SYNC').toArray();
+    return await this.database.invoices
+      .where('syncStatus')
+      .equals('PENDING_SYNC')
+      .toArray();
   }
 }
 

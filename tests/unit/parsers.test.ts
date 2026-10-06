@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { calculateNFeKeyDv, validateNFeKeyChecksum } from '@/domain/validators/key-checksum';
+import {
+  calculateNFeKeyDv,
+  validateNFeKeyChecksum,
+} from '@/domain/validators/key-checksum';
 import { parseNFeKey, formatAccessKey } from '@/domain/parsers/nfe-key-parser';
 import { parseScannedInput } from '@/domain/parsers/nfce-url-parser';
 
@@ -28,7 +31,9 @@ describe('Domain: Módulo 11 & Dígito Verificador', () => {
 
   it('deve retornar falso para chaves com tamanho diferente de 44 dígitos', () => {
     expect(validateNFeKeyChecksum('12345')).toBe(false);
-    expect(validateNFeKeyChecksum('3526101234567800019955001000000001100000001')).toBe(false); // 43 dígitos
+    expect(validateNFeKeyChecksum('3526101234567800019955001000000001100000001')).toBe(
+      false
+    ); // 43 dígitos
   });
 });
 

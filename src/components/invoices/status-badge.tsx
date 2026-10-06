@@ -38,8 +38,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, value }) => {
           isNFe
             ? 'border-sky-500/30 bg-sky-500/10 text-sky-400'
             : isNFCe
-            ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
-            : 'border-slate-700 bg-slate-800 text-slate-400'
+              ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+              : 'border-slate-700 bg-slate-800 text-slate-400'
         }`}
       >
         {isNFe ? 'NF-e (Mod. 55)' : isNFCe ? 'NFC-e (Mod. 65)' : 'Outro'}

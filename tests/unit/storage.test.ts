@@ -37,7 +37,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       totalAmount: 189.5,
       imageBlob: fakeBlob,
       sefazDataStatus: 'PENDING',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     expect(id).toBeDefined();
@@ -66,7 +66,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       issuerCnpj: '98765432000188',
       issuerName: 'Supermercado do Bairro',
       sefazDataStatus: 'SUCCESS',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     const found = await repository.findByAccessKey(accessKey);
@@ -83,7 +83,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       type: 'NFE',
       issuerCnpj: '12345678000199',
       sefazDataStatus: 'PENDING',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     // Segunda tentativa com a mesma chave deve falhar pelo índice único &accessKey
@@ -93,7 +93,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
         type: 'NFE',
         issuerCnpj: '12345678000199',
         sefazDataStatus: 'PENDING',
-        syncStatus: 'PENDING_SYNC'
+        syncStatus: 'PENDING_SYNC',
       })
     ).rejects.toThrow();
   });
@@ -105,13 +105,13 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       issuerCnpj: '12345678000199',
       issuerName: 'Nome Provisório',
       sefazDataStatus: 'PENDING',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     await repository.update(id, {
       issuerName: 'Nome Corrigido Oficial Ltda',
       syncStatus: 'SYNCED',
-      totalAmount: 250.75
+      totalAmount: 250.75,
     });
 
     const updated = await repository.findById(id);
@@ -127,7 +127,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       type: 'NFE',
       issuerCnpj: '11111111000101',
       sefazDataStatus: 'PENDING',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     await repository.create({
@@ -135,7 +135,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       type: 'NFCE',
       issuerCnpj: '22222222000102',
       sefazDataStatus: 'SUCCESS',
-      syncStatus: 'SYNCED'
+      syncStatus: 'SYNCED',
     });
 
     const pending = await repository.listPendingSync();
@@ -149,7 +149,7 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
       type: 'NFE',
       issuerCnpj: '99999999000199',
       sefazDataStatus: 'PENDING',
-      syncStatus: 'PENDING_SYNC'
+      syncStatus: 'PENDING_SYNC',
     });
 
     expect(await repository.findById(id)).toBeDefined();

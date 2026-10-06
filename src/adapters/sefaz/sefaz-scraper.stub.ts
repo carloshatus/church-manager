@@ -9,15 +9,17 @@ export class SefazScraperStub implements ISefazScraper {
     console.info(`[SefazScraperStub] Web scraping agendado para a URL: ${qrCodeUrl}`);
     return {
       accessKey: '',
-      items: []
+      items: [],
     };
   }
 
   async scrapeByAccessKey(accessKey: string, uf: string): Promise<SefazScrapeResult> {
-    console.info(`[SefazScraperStub] Web scraping agendado para a chave: ${accessKey} (UF: ${uf})`);
+    console.info(
+      `[SefazScraperStub] Web scraping agendado para a chave: ${accessKey} (UF: ${uf})`
+    );
     return {
       accessKey,
-      items: []
+      items: [],
     };
   }
 }

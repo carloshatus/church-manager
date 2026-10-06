@@ -23,7 +23,7 @@ export function parseScannedInput(input: string): ScannedInputResult {
     if (cleanKey.length === 44) {
       return {
         isUrl: false,
-        accessKey: cleanKey
+        accessKey: cleanKey,
       };
     }
     throw new Error(
@@ -75,11 +75,14 @@ export function parseScannedInput(input: string): ScannedInputResult {
       return { isUrl: true, qrCodeUrl, accessKey: any44Digits[0] };
     }
 
-    throw new Error('Não foi possível identificar a chave de 44 dígitos nesta URL de QR Code.');
-  } catch (err: any) {
-    if (err.message.includes('chave de 44 dígitos')) {
+    throw new Error(
+      'Não foi possível identificar a chave de 44 dígitos nesta URL de QR Code.'
+    );
+  } catch (err: unknown) {
+    const error = err as Error;
+    if (error.message.includes('chave de 44 dígitos')) {
       throw err;
     }
-    throw new Error(`Erro ao interpretar URL da SEFAZ: ${err.message}`);
+    throw new Error(`Erro ao interpretar URL da SEFAZ: ${error.message}`, { cause: err });
   }
 }

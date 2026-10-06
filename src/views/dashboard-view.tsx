@@ -22,10 +22,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     syncFilter: 'ALL',
   });
 
-  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] = useState<Invoice | null>(null);
+  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] =
+    useState<Invoice | null>(null);
 
   // Consulta reativa ao IndexedDB via useLiveQuery
-  const invoices = useLiveQuery(() => db.invoices.orderBy('createdAt').reverse().toArray());
+  const invoices = useLiveQuery(() =>
+    db.invoices.orderBy('createdAt').reverse().toArray()
+  );
 
   const handleDelete = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir esta nota fiscal do banco local?')) {

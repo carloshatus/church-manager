@@ -42,7 +42,7 @@ describe('Form Store: useInvoiceFormStore', () => {
     vi.spyOn(cnpjService, 'resolveCnpj').mockResolvedValue({
       cnpj: '12345678000199',
       razaoSocial: 'Comércio de Materiais de Construção Ltda',
-      provider: 'BrasilAPI'
+      provider: 'BrasilAPI',
     });
 
     const store = useInvoiceFormStore.getState();
@@ -72,7 +72,9 @@ describe('Form Store: useInvoiceFormStore', () => {
 
     // Usuário insere Razão Social manualmente
     store.setFormField('issuerName', 'Nome Digitado Manualmente');
-    expect(useInvoiceFormStore.getState().fields.issuerName).toBe('Nome Digitado Manualmente');
+    expect(useInvoiceFormStore.getState().fields.issuerName).toBe(
+      'Nome Digitado Manualmente'
+    );
   });
 
   it('deve salvar a nota fiscal no repositório IndexedDB e resetar o formulário', async () => {
@@ -94,7 +96,7 @@ describe('Form Store: useInvoiceFormStore', () => {
         issuerName: 'Igreja Local',
         totalAmount: 230,
         syncStatus: 'PENDING_SYNC',
-        sefazDataStatus: 'PENDING'
+        sefazDataStatus: 'PENDING',
       })
     );
 

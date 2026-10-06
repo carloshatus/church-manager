@@ -15,7 +15,8 @@ export class ChurchManagerDB extends Dexie {
     // & = índice único (chave de acesso não pode ser duplicada)
     // ++ = chave primária numérica auto-incrementada
     this.version(1).stores({
-      invoices: '++id, &accessKey, type, emissionDate, issuerCnpj, syncStatus, sefazDataStatus, createdAt, updatedAt'
+      invoices:
+        '++id, &accessKey, type, emissionDate, issuerCnpj, syncStatus, sefazDataStatus, createdAt, updatedAt',
     });
   }
 }

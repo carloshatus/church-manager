@@ -12,11 +12,8 @@ export const NewInvoiceView: React.FC<NewInvoiceViewProps> = ({
   onBackToDashboard,
   onInvoiceSaved,
 }) => {
-  const {
-    isScanningModalOpen,
-    setScanningModalOpen,
-    handleScannedData,
-  } = useInvoiceFormStore();
+  const { isScanningModalOpen, setScanningModalOpen, handleScannedData } =
+    useInvoiceFormStore();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -57,7 +54,10 @@ export const NewInvoiceView: React.FC<NewInvoiceViewProps> = ({
       <div className="rounded-2xl border border-slate-800/80 bg-slate-900/30 p-4 flex items-start gap-3 text-xs text-slate-400">
         <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
         <p>
-          <strong className="text-slate-200">100% Offline-First:</strong> Esta nota e a foto do cupom são salvas instantaneamente no banco de dados local do seu aparelho. Mesmo sem internet ou com queda na API da Receita Federal, você pode preencher manualmente a Razão Social e salvar.
+          <strong className="text-slate-200">100% Offline-First:</strong> Esta nota e a
+          foto do cupom são salvas instantaneamente no banco de dados local do seu
+          aparelho. Mesmo sem internet ou com queda na API da Receita Federal, você pode
+          preencher manualmente a Razão Social e salvar.
         </p>
       </div>
 

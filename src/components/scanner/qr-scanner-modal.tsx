@@ -21,19 +21,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [showManualInput, setShowManualInput] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) {
-      setCameraError(null);
-      setManualInput('');
-      setShowManualInput(false);
-      return;
-    }
+    if (!isOpen) return;
 
     let isMounted = true;
     let scannerInstance: Html5Qrcode | null = null;
 
     const startScanner = async () => {
       try {
-        setCameraError(null);
         scannerInstance = new Html5Qrcode(readerElementId, {
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
@@ -63,11 +57,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             // Callback vazio para frames em que nenhum código foi detectado
           }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted) {
           console.warn('Não foi possível iniciar a câmera:', err);
+          const errorName = (err as Error)?.name;
           setCameraError(
-            err.name === 'NotAllowedError'
+            errorName === 'NotAllowedError'
               ? 'Permissão de acesso à câmera negada. Permita o uso da câmera nas configurações do navegador.'
               : 'Nenhuma câmera compatível encontrada ou acesso não seguro (requer HTTPS).'
           );
@@ -96,6 +91,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       isMounted = false;
       clearTimeout(timer);
       handleStop();
+      setCameraError(null);
+      setManualInput('');
+      setShowManualInput(false);
     };
   }, [isOpen, onClose, onScanSuccess]);
 
@@ -175,7 +173,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       {/* Footer / Opção de Chavear para Entrada Manual */}
       <div className="w-full max-w-sm flex flex-col items-center gap-3 pb-6">
         <p className="text-slate-400 text-xs text-center">
-          Centralize o QR Code do cupom ou o código de barras da nota fiscal no quadrado acima.
+          Centralize o QR Code do cupom ou o código de barras da nota fiscal no quadrado
+          acima.
         </p>
 
         {!showManualInput && !cameraError && (

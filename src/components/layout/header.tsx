@@ -1,5 +1,12 @@
 import React from 'react';
-import { Wifi, WifiOff, FileSpreadsheet, ShieldCheck, LayoutDashboard, PlusCircle } from 'lucide-react';
+import {
+  Wifi,
+  WifiOff,
+  FileSpreadsheet,
+  ShieldCheck,
+  LayoutDashboard,
+  PlusCircle,
+} from 'lucide-react';
 import { useNetworkStore } from '@/stores/use-network-store';
 
 interface HeaderProps {
@@ -36,7 +43,9 @@ export const Header: React.FC<HeaderProps> = ({
                 PWA
               </span>
             </div>
-            <p className="text-xs text-slate-400">Notas & Cupons Fiscais (NF-e / NFC-e)</p>
+            <p className="text-xs text-slate-400">
+              Notas & Cupons Fiscais (NF-e / NFC-e)
+            </p>
           </div>
         </div>
 

@@ -11,10 +11,10 @@ export interface ParsedKeyData {
   year: number;
   month: number;
   emissionPeriod: string; // Formato "YYYY-MM"
-  cnpj: string;           // 14 dígitos
-  model: string;          // "55" ou "65"
-  series: string;         // Número da série
-  number: string;         // Número da nota
+  cnpj: string; // 14 dígitos
+  model: string; // "55" ou "65"
+  series: string; // Número da série
+  number: string; // Número da nota
   emissionType: string;
   randomCode: string;
   dv: string;
@@ -36,7 +36,9 @@ export function parseNFeKey(rawKey: string): ParsedKeyData {
   const cleanKey = rawKey.replace(/\D/g, '');
 
   if (cleanKey.length !== 44) {
-    throw new Error(`Chave de acesso inválida. Esperado 44 dígitos numéricos, recebido: ${cleanKey.length}`);
+    throw new Error(
+      `Chave de acesso inválida. Esperado 44 dígitos numéricos, recebido: ${cleanKey.length}`
+    );
   }
 
   const ufCode = cleanKey.substring(0, 2);
@@ -78,6 +80,6 @@ export function parseNFeKey(rawKey: string): ParsedKeyData {
     emissionType,
     randomCode,
     dv,
-    isValidChecksum
+    isValidChecksum,
   };
 }

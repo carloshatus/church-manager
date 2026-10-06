@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateMetrics } from '@/components/dashboard/metric-cards';
+import { calculateMetrics } from '@/domain/services/metrics';
 import type { Invoice } from '@/domain/entities/invoice';
 
 describe('Dashboard: Métricas Financeiras & Consolidação', () => {
@@ -23,7 +23,7 @@ describe('Dashboard: Métricas Financeiras & Consolidação', () => {
         syncStatus: 'PENDING_SYNC',
         sefazDataStatus: 'PENDING',
         createdAt: 1000,
-        updatedAt: 1000
+        updatedAt: 1000,
       },
       {
         id: 2,
@@ -34,7 +34,7 @@ describe('Dashboard: Métricas Financeiras & Consolidação', () => {
         syncStatus: 'SYNCED',
         sefazDataStatus: 'SUCCESS',
         createdAt: 2000,
-        updatedAt: 2000
+        updatedAt: 2000,
       },
       {
         id: 3,
@@ -45,8 +45,8 @@ describe('Dashboard: Métricas Financeiras & Consolidação', () => {
         syncStatus: 'PENDING_SYNC',
         sefazDataStatus: 'PENDING',
         createdAt: 3000,
-        updatedAt: 3000
-      }
+        updatedAt: 3000,
+      },
     ];
 
     const metrics = calculateMetrics(mockInvoices);

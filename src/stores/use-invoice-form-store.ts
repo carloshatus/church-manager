@@ -53,7 +53,7 @@ const initialFields: FormFields = {
   model: '',
   series: '',
   number: '',
-  totalAmount: ''
+  totalAmount: '',
 };
 
 export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
@@ -120,13 +120,16 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
           series: parsedKey.series,
           number: parsedKey.number,
         },
-        isScanningModalOpen: false
+        isScanningModalOpen: false,
       }));
 
       // 3. Dispara a consulta assíncrona ao CNPJ
       await get().retryResolveCnpj();
-    } catch (err: any) {
-      set({ formError: err.message, isScanningModalOpen: false });
+    } catch (err: unknown) {
+      set({
+        formError: (err as Error)?.message || 'Erro ao processar dados',
+        isScanningModalOpen: false,
+      });
     }
   },
 
@@ -141,15 +144,15 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       set((state) => ({
         fields: {
           ...state.fields,
-          issuerName: cnpjInfo.razaoSocial
+          issuerName: cnpjInfo.razaoSocial,
         },
         cnpjProviderUsed: cnpjInfo.provider,
-        cnpjError: null
+        cnpjError: null,
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       set({
-        cnpjError: err.message,
-        cnpjProviderUsed: null
+        cnpjError: (err as Error)?.message || 'Erro ao consultar CNPJ',
+        cnpjProviderUsed: null,
       });
     } finally {
       set({ isResolvingCnpj: false });
@@ -169,9 +172,9 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       const { url } = ImageCompressionService.createPreviewUrl(compressedBlob);
       set({
         imageBlob: compressedBlob,
-        imagePreviewUrl: url
+        imagePreviewUrl: url,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Falha na compressão da imagem:', err);
     } finally {
       set({ isCompressingPhoto: false });
@@ -199,7 +202,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       cnpjProviderUsed: null,
       formError: null,
       isSubmitting: false,
-      lastSavedId: null
+      lastSavedId: null,
     });
   },
 
@@ -246,11 +249,12 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       get().resetForm();
       set({ lastSavedId: id });
       return id;
-    } catch (err: any) {
-      set({ formError: err.message });
+    } catch (err: unknown) {
+      const errorMsg = (err as Error)?.message || 'Erro ao salvar nota fiscal';
+      set({ formError: errorMsg });
       throw err;
     } finally {
       set({ isSubmitting: false });
     }
-  }
+  },
 }));

@@ -10,11 +10,11 @@ export interface ImageCompressionOptions {
 
 export class ImageCompressionService {
   private static defaultOptions = {
-    maxSizeMB: 0.8,              // Alvo de compressão: no máximo 800KB
-    maxWidthOrHeight: 1600,      // Resolução suficiente para OCR e leitura de itens
-    useWebWorker: true,          // Não trava a UI durante a compressão
-    fileType: 'image/jpeg',      // Padronização em JPEG
-    initialQuality: 0.85
+    maxSizeMB: 0.8, // Alvo de compressão: no máximo 800KB
+    maxWidthOrHeight: 1600, // Resolução suficiente para OCR e leitura de itens
+    useWebWorker: true, // Não trava a UI durante a compressão
+    fileType: 'image/jpeg', // Padronização em JPEG
+    initialQuality: 0.85,
   };
 
   /**
@@ -40,7 +40,10 @@ export class ImageCompressionService {
       const compressedBlob = await imageCompression(targetFile, options);
       return compressedBlob;
     } catch (error) {
-      console.warn('Compressão falhou ou não suportada no ambiente, usando original:', error);
+      console.warn(
+        'Compressão falhou ou não suportada no ambiente, usando original:',
+        error
+      );
       return file;
     }
   }
@@ -60,13 +63,13 @@ export class ImageCompressionService {
           } catch {
             // Ignora se já tiver sido revogado
           }
-        }
+        },
       };
     }
 
     return {
       url: '',
-      revoke: () => {}
+      revoke: () => {},
     };
   }
 }

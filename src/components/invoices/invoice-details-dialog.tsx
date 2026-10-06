@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Invoice } from '@/domain/entities/invoice';
 import { StatusBadge } from './status-badge';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
@@ -10,7 +10,7 @@ import {
   Building2,
   FileText,
   RefreshCw,
-  Camera
+  Camera,
 } from 'lucide-react';
 import { invoiceRepository } from '@/adapters/storage/dexie-invoice.repository';
 
@@ -28,22 +28,21 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
   onInvoiceUpdated,
 }) => {
   const [copiedKey, setCopiedKey] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUpdatingSync, setIsUpdatingSync] = useState(false);
 
+  const imageBlob = invoice?.imageBlob;
+  const photoUrl = useMemo(() => {
+    if (!imageBlob) return null;
+    return URL.createObjectURL(imageBlob);
+  }, [imageBlob]);
+
   useEffect(() => {
-    if (!invoice?.imageBlob) {
-      setPhotoUrl(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(invoice.imageBlob);
-    setPhotoUrl(url);
-
     return () => {
-      URL.revokeObjectURL(url);
+      if (photoUrl) {
+        URL.revokeObjectURL(photoUrl);
+      }
     };
-  }, [invoice?.imageBlob]);
+  }, [photoUrl]);
 
   if (!isOpen || !invoice) return null;
 
@@ -81,9 +80,7 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
               <Building2 className="w-5 h-5 text-primary" />
               {invoice.issuerName || 'Razão Social não informada'}
             </h2>
-            <p className="text-xs text-slate-400 font-mono">
-              CNPJ: {invoice.issuerCnpj}
-            </p>
+            <p className="text-xs text-slate-400 font-mono">CNPJ: {invoice.issuerCnpj}</p>
           </div>
 
           <button
@@ -144,7 +141,9 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
 
           <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
             <span className="text-slate-500 block mb-0.5">Emissão</span>
-            <span className="font-semibold text-white">{invoice.emissionDate || 'N/A'}</span>
+            <span className="font-semibold text-white">
+              {invoice.emissionDate || 'N/A'}
+            </span>
           </div>
         </div>
 
@@ -155,7 +154,8 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
               Valor Total Registrado
             </span>
             <span className="text-xl font-extrabold text-emerald-400">
-              R$ {invoice.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R${' '}
+              {invoice.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
           </div>
         )}
@@ -210,7 +210,9 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
             disabled={isUpdatingSync}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isUpdatingSync ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${isUpdatingSync ? 'animate-spin' : ''}`}
+            />
             {invoice.syncStatus === 'PENDING_SYNC'
               ? 'Marcar como Sincronizado'
               : 'Marcar como Pendente'}

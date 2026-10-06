@@ -8,10 +8,7 @@ export class CnpjService {
 
   constructor(providers?: ICnpjProvider[]) {
     // Ordem de prioridade padrão: 1º BrasilAPI, 2º Minha Receita
-    this.providers = providers || [
-      new BrasilApiAdapter(),
-      new MinhaReceitaAdapter()
-    ];
+    this.providers = providers || [new BrasilApiAdapter(), new MinhaReceitaAdapter()];
   }
 
   /**
@@ -22,7 +19,9 @@ export class CnpjService {
     const cleanCnpj = cnpj.replace(/\D/g, '');
 
     if (cleanCnpj.length !== 14) {
-      throw new Error(`CNPJ deve conter 14 dígitos numéricos. Recebido: ${cleanCnpj.length}`);
+      throw new Error(
+        `CNPJ deve conter 14 dígitos numéricos. Recebido: ${cleanCnpj.length}`
+      );
     }
 
     // 1. Verifica cache local em memória
@@ -39,9 +38,12 @@ export class CnpjService {
         // Armazena no cache em memória
         this.cache.set(cleanCnpj, result);
         return result;
-      } catch (err: any) {
-        console.warn(`[CnpjService] Falha no provedor ${provider.name}: ${err.message}. Acionando contingência...`);
-        errors.push(`${provider.name}: ${err.message}`);
+      } catch (err: unknown) {
+        const errorMsg = (err as Error)?.message || 'Erro desconhecido';
+        console.warn(
+          `[CnpjService] Falha no provedor ${provider.name}: ${errorMsg}. Acionando contingência...`
+        );
+        errors.push(`${provider.name}: ${errorMsg}`);
       }
     }
 
