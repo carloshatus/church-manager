@@ -178,9 +178,9 @@ O desenvolvimento está estruturado em 7 etapas incrementais. Cada etapa possui 
 | **2** | **Domínio Fiscal & Parsers (com Vitest)** | ✅ **Concluída** | Módulo 11, decomposição da chave de 44 dígitos, extração de URLs da SEFAZ e 13 testes unitários. |
 | **3** | **IndexedDB (Dexie.js) & Fotos (Blob)** | ✅ **Concluída** | Banco `ChurchManagerDB`, repositório CRUD, compressão Web Worker e 7 testes com `fake-indexeddb`. |
 | **4** | **Ports & Adapters (Resiliência de CNPJ)** | ✅ **Concluída** | BrasilAPI + Minha Receita com fallback automático, cache em memória e 8 testes unitários. |
-| **5** | **Captura Física (Scanner & Câmera)** | ⏳ *Próxima* | Modal com `html5-qrcode`, ciclo de vida seguro e captura de fotos. |
-| **6** | **Formulário de Registro Completo** | 📅 *Planejada* | Preenchimento automático, override manual e persistência no Dexie. |
-| **7** | **Dashboard, Métricas & Auditoria PWA** | 📅 *Planejada* | Totalizadores em R$, busca em tempo real, visualizador de recibos e auditoria offline. |
+| **5** | **Captura Física (Scanner & Câmera)** | ✅ **Concluída** | Modal com `html5-qrcode`, ciclo de vida seguro, mira laser e captura de fotos com compressão. |
+| **6** | **Formulário de Registro Completo** | ✅ **Concluída** | Preenchimento automático pós-scan, override manual livre em todos os campos, retry e persistência no Dexie. |
+| **7** | **Dashboard, Métricas & Auditoria PWA** | ⏳ *Próxima* | Totalizadores em R$, busca em tempo real, visualizador de recibos e auditoria offline. |
 
 ---
 
