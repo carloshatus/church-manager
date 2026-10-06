@@ -175,9 +175,9 @@ O desenvolvimento está estruturado em 7 etapas incrementais. Cada etapa possui 
 | Etapa | Foco Principal | Status | Entregável / Checkpoint |
 | :---: | :--- | :---: | :--- |
 | **1** | **Fundação do Projeto, PWA & Design System** | ✅ **Concluída** | Vite, Tailwind dark mode, Service Worker e Header com status de rede. |
-| **2** | **Domínio Fiscal & Parsers (com Vitest)** | ⏳ *Próxima* | Módulo 11, decomposição da chave de 44 dígitos e testes unitários. |
-| **3** | **IndexedDB (Dexie.js) & Fotos (Blob)** | 📅 *Planejada* | Banco local, repositório CRUD e compressão Web Worker com `Blob`. |
-| **4** | **Ports & Adapters (Resiliência de CNPJ)** | 📅 *Planejada* | BrasilAPI + Minha Receita com fallback automático e cache. |
+| **2** | **Domínio Fiscal & Parsers (com Vitest)** | ✅ **Concluída** | Módulo 11, decomposição da chave de 44 dígitos, extração de URLs da SEFAZ e 13 testes unitários. |
+| **3** | **IndexedDB (Dexie.js) & Fotos (Blob)** | ✅ **Concluída** | Banco `ChurchManagerDB`, repositório CRUD, compressão Web Worker e 7 testes com `fake-indexeddb`. |
+| **4** | **Ports & Adapters (Resiliência de CNPJ)** | ⏳ *Próxima* | BrasilAPI + Minha Receita com fallback automático e cache. |
 | **5** | **Captura Física (Scanner & Câmera)** | 📅 *Planejada* | Modal com `html5-qrcode`, ciclo de vida seguro e captura de fotos. |
 | **6** | **Formulário de Registro Completo** | 📅 *Planejada* | Preenchimento automático, override manual e persistência no Dexie. |
 | **7** | **Dashboard, Métricas & Auditoria PWA** | 📅 *Planejada* | Totalizadores em R$, busca em tempo real, visualizador de recibos e auditoria offline. |
