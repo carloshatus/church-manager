@@ -19,11 +19,13 @@ export class BrasilApiAdapter implements ICnpjProvider {
   constructor(
     baseUrl = 'https://brasilapi.com.br/api/cnpj/v1',
     timeoutMs = 6000,
-    fetchFn = fetch
+    fetchFn?: typeof fetch
   ) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
-    this.fetchFn = fetchFn;
+    this.fetchFn = fetchFn
+      ? fetchFn.bind(globalThis)
+      : (...args: Parameters<typeof fetch>) => globalThis.fetch(...args);
   }
 
   async fetchByCnpj(cleanCnpj: string): Promise<CnpjDto> {

@@ -16,10 +16,16 @@ export class MinhaReceitaAdapter implements ICnpjProvider {
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
 
-  constructor(baseUrl = 'https://minhareceita.org', timeoutMs = 7000, fetchFn = fetch) {
+  constructor(
+    baseUrl = 'https://minhareceita.org',
+    timeoutMs = 7000,
+    fetchFn?: typeof fetch
+  ) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
-    this.fetchFn = fetchFn;
+    this.fetchFn = fetchFn
+      ? fetchFn.bind(globalThis)
+      : (...args: Parameters<typeof fetch>) => globalThis.fetch(...args);
   }
 
   async fetchByCnpj(cleanCnpj: string): Promise<CnpjDto> {
