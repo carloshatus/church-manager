@@ -20,7 +20,7 @@ export const App: React.FC = () => {
       <Header activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Conteúdo Principal Dinâmico */}
-      <main className="flex-1 container mx-auto px-4 sm:px-6 py-6 max-w-5xl">
+      <main className="flex-1 container mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-8 max-w-5xl">
         {activeTab === 'dashboard' ? (
           <DashboardView onNavigateToNewInvoice={() => setActiveTab('new-invoice')} />
         ) : (
@@ -36,7 +36,7 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="border-t border-slate-900/80 py-6 text-center text-xs text-slate-500">
+      <footer className="hidden sm:block border-t border-slate-900/80 py-6 text-center text-xs text-slate-500">
         Church Manager • Módulo Fiscal PWA Offline-First • {new Date().getFullYear()}
       </footer>
     </div>
