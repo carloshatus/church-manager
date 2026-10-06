@@ -170,4 +170,13 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     );
     expect(primaryMock.fetchByCnpj).not.toHaveBeenCalled();
   });
+
+  it('deve instanciar por padrão MinhaReceita como 1º (primário) e BrasilAPI como 2º (fallback)', () => {
+    const defaultService = new CnpjService();
+    const providers = defaultService.getProviders();
+
+    expect(providers).toHaveLength(2);
+    expect(providers[0].name).toBe('MinhaReceita');
+    expect(providers[1].name).toBe('BrasilAPI');
+  });
 });

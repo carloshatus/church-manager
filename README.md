@@ -44,8 +44,8 @@ Muitas vezes, as compras ocorrem em locais com baixa conectividade à internet. 
    - Decomposição da chave de 44 dígitos: UF de emissão, ano/mês, CNPJ do emitente, modelo (55 ou 65), série, número e validação matemática de dígito verificador via **Módulo 11**.
    - Extração da chave a partir de URLs de portais de SEFAZ estaduais (padrão nacional v2 `p=...|2|1|1|...`, `chNFe` e parâmetros de consulta), preservando a URL original para futuro web scraping.
 3. 🔄 **Resiliência e Fallback de CNPJ (Ports & Adapters)**:
-   - Consulta primária automática na **BrasilAPI** para obter a Razão Social da empresa emitente.
-   - Fallback sequencial transparente para a **Minha Receita** caso o provedor primário falhe, oscile ou atinja timeout.
+   - Consulta primária automática na **Minha Receita** (alta velocidade e estabilidade) para obter a Razão Social da empresa emitente.
+   - Fallback sequencial transparente para a **BrasilAPI** caso o provedor primário oscile ou atinja timeout.
    - Cache em memória para evitar requisições repetidas.
    - **Edição Manual & Retry**: Em caso de falha de conexão ou CNPJ não encontrado, o usuário pode digitar a Razão Social livremente e re-tentar a qualquer momento.
 4. 🖼️ **Captura & Compressão Otimizada de Comprovantes**:

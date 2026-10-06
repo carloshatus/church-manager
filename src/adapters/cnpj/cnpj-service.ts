@@ -1,14 +1,14 @@
 import type { ICnpjProvider, CnpjDto } from '@/ports/cnpj-provider.port';
-import { BrasilApiAdapter } from './brasil-api.adapter';
 import { MinhaReceitaAdapter } from './minha-receita.adapter';
+import { BrasilApiAdapter } from './brasil-api.adapter';
 
 export class CnpjService {
   private providers: ICnpjProvider[];
   private cache = new Map<string, CnpjDto>();
 
   constructor(providers?: ICnpjProvider[]) {
-    // Ordem de prioridade padrão: 1º BrasilAPI, 2º Minha Receita
-    this.providers = providers || [new BrasilApiAdapter(), new MinhaReceitaAdapter()];
+    // Ordem de prioridade padrão: 1º Minha Receita (mais rápido/estável), 2º BrasilAPI (contingência)
+    this.providers = providers || [new MinhaReceitaAdapter(), new BrasilApiAdapter()];
   }
 
   /**
@@ -58,6 +58,13 @@ export class CnpjService {
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Retorna a lista de provedores configurados
+   */
+  getProviders(): ICnpjProvider[] {
+    return [...this.providers];
   }
 
   /**
