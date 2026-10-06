@@ -2,15 +2,12 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/adapters/storage/db';
 import { invoiceRepository } from '@/adapters/storage/dexie-invoice.repository';
+import type { Invoice } from '@/domain/entities/invoice';
 import { InvoiceCard } from '@/components/invoices/invoice-card';
-import {
-  FileText,
-  DollarSign,
-  Clock,
-  Search,
-  PlusCircle,
-  FileQuestion
-} from 'lucide-react';
+import { MetricCards } from '@/components/dashboard/metric-cards';
+import { FiltersBar, type FilterState } from '@/components/dashboard/filters-bar';
+import { InvoiceDetailsDialog } from '@/components/invoices/invoice-details-dialog';
+import { PlusCircle, FileQuestion } from 'lucide-react';
 
 interface DashboardViewProps {
   onNavigateToNewInvoice: () => void;
@@ -19,9 +16,15 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToNewInvoice,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<FilterState>({
+    searchTerm: '',
+    typeFilter: 'ALL',
+    syncFilter: 'ALL',
+  });
 
-  // Consulta reativa ao IndexedDB usando useLiveQuery (atualiza automaticamente ao inserir notas)
+  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] = useState<Invoice | null>(null);
+
+  // Consulta reativa ao IndexedDB via useLiveQuery
   const invoices = useLiveQuery(() => db.invoices.orderBy('createdAt').reverse().toArray());
 
   const handleDelete = async (id: number) => {
@@ -32,19 +35,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const allInvoices = invoices || [];
 
-  // Cálculos de métricas
-  const totalInvoices = allInvoices.length;
-  const totalAmount = allInvoices.reduce((acc, inv) => acc + (inv.totalAmount || 0), 0);
-  const pendingSyncCount = allInvoices.filter((inv) => inv.syncStatus === 'PENDING_SYNC').length;
-
-  // Filtragem por busca
+  // Lógica de filtragem
   const filteredInvoices = allInvoices.filter((inv) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    const matchName = inv.issuerName?.toLowerCase().includes(term);
-    const matchCnpj = inv.issuerCnpj.includes(term);
-    const matchKey = inv.accessKey.includes(term);
-    return matchName || matchCnpj || matchKey;
+    // 1. Filtro por Modelo
+    if (filters.typeFilter !== 'ALL' && inv.type !== filters.typeFilter) {
+      return false;
+    }
+
+    // 2. Filtro por Sync Status
+    if (filters.syncFilter !== 'ALL' && inv.syncStatus !== filters.syncFilter) {
+      return false;
+    }
+
+    // 3. Filtro por Termo de Busca
+    if (filters.searchTerm.trim() !== '') {
+      const term = filters.searchTerm.toLowerCase();
+      const matchName = inv.issuerName?.toLowerCase().includes(term);
+      const matchCnpj = inv.issuerCnpj.includes(term);
+      const matchKey = inv.accessKey.includes(term);
+      if (!matchName && !matchCnpj && !matchKey) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   return (
@@ -56,7 +70,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Painel Fiscal
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Visão consolidada de notas e cupons fiscais armazenados no dispositivo
+            Visão consolidada e controle de notas e cupons fiscais armazenados no aparelho
           </p>
         </div>
 
@@ -70,62 +84,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
       </div>
 
-      {/* Cards de Métricas Principais */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Total de Notas */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-400">Total de Notas</span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-              <FileText className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-white">
-            {totalInvoices}
-          </p>
-          <span className="text-[11px] text-slate-500">Documentos fiscais no IndexedDB</span>
-        </div>
+      {/* Cards de Métricas Financeiras e Sincronização */}
+      <MetricCards invoices={allInvoices} />
 
-        {/* Valor Total */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-400">Total Acumulado</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
-            R$ {totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-          <span className="text-[11px] text-slate-500">Soma dos valores das notas</span>
-        </div>
-
-        {/* Pendentes de Sincronização */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-400">Pendentes de Sync</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-amber-400">
-            {pendingSyncCount}
-          </p>
-          <span className="text-[11px] text-slate-500">Aguardando envio remoto</span>
-        </div>
-      </div>
-
-      {/* Barra de Pesquisa e Filtros */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar por Razão Social, CNPJ ou chave de acesso..."
-          className="w-full rounded-xl border border-slate-800 bg-slate-900/80 pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-primary focus:outline-none"
-        />
-      </div>
+      {/* Barra de Busca e Filtros Avançados */}
+      <FiltersBar
+        filters={filters}
+        onFilterChange={setFilters}
+        resultsCount={filteredInvoices.length}
+        totalCount={allInvoices.length}
+      />
 
       {/* Lista de Notas Fiscais ou Estado Vazio */}
       {filteredInvoices.length > 0 ? (
@@ -135,6 +103,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               key={invoice.id || invoice.accessKey}
               invoice={invoice}
               onDelete={handleDelete}
+              onViewDetails={(inv) => setSelectedInvoiceForDetails(inv)}
             />
           ))}
         </div>
@@ -145,15 +114,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-white">
-              {searchTerm ? 'Nenhuma nota encontrada para esta busca' : 'Nenhuma nota fiscal cadastrada ainda'}
+              {allInvoices.length > 0
+                ? 'Nenhuma nota encontrada com os filtros atuais'
+                : 'Nenhuma nota fiscal cadastrada ainda'}
             </h3>
             <p className="text-xs text-slate-400 max-w-sm">
-              {searchTerm
-                ? 'Tente buscar por outro termo, CNPJ ou limpe o campo de busca.'
-                : 'Escaneie o QR Code de um cupom NFC-e ou registre uma chave para começar.'}
+              {allInvoices.length > 0
+                ? 'Tente alterar os filtros ou o termo de busca para localizar a nota.'
+                : 'Escaneie o QR Code de um cupom NFC-e ou registre uma nota para começar.'}
             </p>
           </div>
-          {!searchTerm && (
+          {allInvoices.length === 0 && (
             <button
               type="button"
               onClick={onNavigateToNewInvoice}
@@ -165,6 +136,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
       )}
+
+      {/* Modal de Detalhes da Nota Fiscal */}
+      <InvoiceDetailsDialog
+        isOpen={Boolean(selectedInvoiceForDetails)}
+        invoice={selectedInvoiceForDetails}
+        onClose={() => setSelectedInvoiceForDetails(null)}
+      />
     </div>
   );
 };

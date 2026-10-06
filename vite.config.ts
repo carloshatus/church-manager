@@ -62,5 +62,22 @@ export default defineConfig({
     alias: {
       '@': path.resolve(import.meta.dirname, './src')
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/dexie') || id.includes('node_modules/zustand')) {
+            return 'vendor-storage';
+          }
+          if (id.includes('node_modules/html5-qrcode')) {
+            return 'vendor-scanner';
+          }
+        }
+      }
+    }
   }
 });

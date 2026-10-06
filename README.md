@@ -180,7 +180,7 @@ O desenvolvimento está estruturado em 7 etapas incrementais. Cada etapa possui 
 | **4** | **Ports & Adapters (Resiliência de CNPJ)** | ✅ **Concluída** | BrasilAPI + Minha Receita com fallback automático, cache em memória e 8 testes unitários. |
 | **5** | **Captura Física (Scanner & Câmera)** | ✅ **Concluída** | Modal com `html5-qrcode`, ciclo de vida seguro, mira laser e captura de fotos com compressão. |
 | **6** | **Formulário de Registro Completo** | ✅ **Concluída** | Preenchimento automático pós-scan, override manual livre em todos os campos, retry e persistência no Dexie. |
-| **7** | **Dashboard, Métricas & Auditoria PWA** | ⏳ *Próxima* | Totalizadores em R$, busca em tempo real, visualizador de recibos e auditoria offline. |
+| **7** | **Dashboard, Métricas & Auditoria PWA** | ✅ **Concluída** | Métricas financeiras em R$, busca em tempo real, visualizador completo de notas com link SEFAZ e PWA auditado. |
 
 ---
 
