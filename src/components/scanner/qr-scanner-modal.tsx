@@ -15,12 +15,58 @@ import {
   ZapOff,
   ZoomIn,
   RotateCw,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface QrScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (decodedText: string) => void;
+}
+
+const PREFERRED_CAMERA_KEY = 'church_manager_preferred_camera';
+
+function formatCameraLabel(label: string, index: number): string {
+  const lower = (label || '').toLowerCase();
+  const isFront =
+    lower.includes('front') ||
+    lower.includes('user') ||
+    lower.includes('selfie') ||
+    lower.includes('frontal');
+
+  if (isFront) {
+    return `Frontal (Selfie) ${label ? `• ${label}` : `#${index + 1}`}`;
+  }
+
+  if (
+    lower.includes('ultra') ||
+    lower.includes('0.5') ||
+    lower.includes('wide-angle') ||
+    lower.includes('wide angle')
+  ) {
+    return `Traseira 0.5x (Grande Angular) ${label ? `• ${label}` : `#${index + 1}`}`;
+  }
+
+  if (
+    lower.includes('tele') ||
+    lower.includes('zoom') ||
+    lower.includes('2x') ||
+    lower.includes('3x')
+  ) {
+    return `Traseira Teleobjetiva/Zoom ${label ? `• ${label}` : `#${index + 1}`}`;
+  }
+
+  if (
+    lower.includes('wide') ||
+    lower.includes('main') ||
+    lower.includes('primary') ||
+    lower.includes('principal') ||
+    lower.includes('1x')
+  ) {
+    return `Traseira 1x (Principal) ${label ? `• ${label}` : `#${index + 1}`}`;
+  }
+
+  return `Câmera Traseira #${index + 1} ${label ? `• ${label}` : ''}`;
 }
 
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
@@ -119,19 +165,22 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         // Tenta aplicar foco contínuo na stream ativa
         try {
           await scanner.applyVideoConstraints({
-            advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
+            advanced: [
+              { focusMode: 'continuous' } as unknown as MediaTrackConstraintSet,
+            ],
           });
         } catch {
           // Navegador pode não suportar focusMode contínuo
         }
 
-        // Atualiza a lista de câmeras disponíveis para permitir troca de lentes
+        // Atualiza a lista de câmeras disponíveis para permitir seleção precisa de lentes
         try {
           const cameras = await Html5Qrcode.getCameras();
           if (cameras && cameras.length > 0) {
             setAvailableCameras(cameras);
             if (preferredCameraId) {
               setActiveCameraId(preferredCameraId);
+              localStorage.setItem(PREFERRED_CAMERA_KEY, preferredCameraId);
             } else {
               const backCameras = cameras.filter(
                 (c) =>
@@ -140,17 +189,19 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                   !c.label.toLowerCase().includes('selfie')
               );
               if (backCameras.length > 0) {
-                // Se a primeira for ultra-wide/0.5x, tenta usar a segunda
+                // Se a primeira for ultra-wide/0.5x, tenta usar a segunda (geralmente a 1x com foco)
                 const isFirstUltra =
                   backCameras[0].label.toLowerCase().includes('ultra') ||
                   backCameras[0].label.toLowerCase().includes('0.5') ||
                   backCameras[0].label.toLowerCase().includes('wide-angle');
 
-                if (isFirstUltra && backCameras.length > 1) {
-                  setActiveCameraId(backCameras[1].id);
-                } else {
-                  setActiveCameraId(backCameras[0].id);
-                }
+                const chosen =
+                  isFirstUltra && backCameras.length > 1
+                    ? backCameras[1].id
+                    : backCameras[0].id;
+
+                setActiveCameraId(chosen);
+                localStorage.setItem(PREFERRED_CAMERA_KEY, chosen);
               } else {
                 setActiveCameraId(cameras[0].id);
               }
@@ -202,9 +253,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     if (!isOpen) return;
 
     let isMounted = true;
+    const savedCamId = localStorage.getItem(PREFERRED_CAMERA_KEY) || undefined;
+
     const timer = setTimeout(() => {
       if (isMounted) {
-        void startCamera();
+        void startCamera(savedCamId);
       }
     }, 150);
 
@@ -220,11 +273,18 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     };
   }, [isOpen, startCamera, handleStop]);
 
-  // Alterna entre as câmeras / lentes traseiras do celular
-  const handleSwitchCamera = async () => {
+  // Troca de câmera via seleção explícita
+  const handleSelectCamera = async (newCameraId: string) => {
+    if (!newCameraId || newCameraId === activeCameraId || isSwitchingCamera) return;
+    setActiveCameraId(newCameraId);
+    localStorage.setItem(PREFERRED_CAMERA_KEY, newCameraId);
+    await startCamera(newCameraId);
+  };
+
+  // Alterna ciclicamente entre as câmeras / lentes traseiras do celular
+  const handleSwitchCameraCycle = async () => {
     if (availableCameras.length <= 1 || isSwitchingCamera) return;
 
-    // Filtra traseiras se possível
     const backCameras = availableCameras.filter(
       (c) =>
         !c.label.toLowerCase().includes('front') &&
@@ -238,8 +298,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const nextCamera = list[nextIndex];
 
     if (nextCamera) {
-      setActiveCameraId(nextCamera.id);
-      await startCamera(nextCamera.id);
+      await handleSelectCamera(nextCamera.id);
     }
   };
 
@@ -297,10 +356,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             return;
           }
         } catch (detectorErr) {
-          console.warn(
-            'BarcodeDetector direto não encontrou, tentando Html5Qrcode...',
-            detectorErr
-          );
+          console.warn('BarcodeDetector direto não encontrou, tentando Html5Qrcode...', detectorErr);
         }
       }
 
@@ -364,11 +420,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             </button>
           )}
 
-          {/* Botão de Trocar Câmera / Lente */}
+          {/* Botão de Trocar Câmera / Lente rápida */}
           {availableCameras.length > 1 && (
             <button
               type="button"
-              onClick={handleSwitchCamera}
+              onClick={handleSwitchCameraCycle}
               disabled={isSwitchingCamera}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 text-slate-200 hover:text-white text-xs font-medium border border-slate-700/60 transition disabled:opacity-50"
               title="Alternar entre lentes da câmera"
@@ -376,7 +432,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
               <SwitchCamera
                 className={`w-4 h-4 text-primary ${isSwitchingCamera ? 'animate-spin' : ''}`}
               />
-              <span className="hidden xs:inline">Trocar Lente</span>
+              <span className="hidden xs:inline">Trocar</span>
             </button>
           )}
 
@@ -395,8 +451,31 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         </div>
       </div>
 
-      {/* Main Viewport do Scanner */}
+      {/* Main Viewport do Scanner com Seletor Explícito de Câmeras */}
       <div className="w-full max-w-sm flex flex-col items-center justify-center my-auto px-2">
+        {/* SELETOR EXPLÍCITO DE CÂMERAS / LENTES (quando houver mais de uma câmera) */}
+        {availableCameras.length > 1 && (
+          <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between gap-2 shadow-lg mb-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium flex-shrink-0">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+              <span>Câmera:</span>
+            </div>
+
+            <select
+              value={activeCameraId || ''}
+              onChange={(e) => void handleSelectCamera(e.target.value)}
+              disabled={isSwitchingCamera}
+              className="flex-1 bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-xl px-2.5 py-1.5 focus:border-primary focus:outline-none truncate"
+            >
+              {availableCameras.map((cam, idx) => (
+                <option key={cam.id} value={cam.id}>
+                  {formatCameraLabel(cam.label, idx)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {!cameraError ? (
           <div className="relative w-full aspect-square overflow-hidden rounded-3xl border-2 border-primary/50 shadow-2xl bg-black">
             <div id={readerElementId} className="w-full h-full" />
@@ -421,9 +500,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         ) : (
           <div className="w-full rounded-2xl border border-red-500/30 bg-red-950/20 p-5 text-center">
             <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-            <h4 className="text-white font-semibold text-sm mb-1">
-              Dificuldade com a Câmera
-            </h4>
+            <h4 className="text-white font-semibold text-sm mb-1">Dificuldade com a Câmera</h4>
             <p className="text-slate-400 text-xs mb-4">{cameraError}</p>
 
             <button
@@ -534,11 +611,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           {availableCameras.length > 1 && !cameraError && (
             <button
               type="button"
-              onClick={handleSwitchCamera}
+              onClick={handleSwitchCameraCycle}
               className="inline-flex items-center gap-1.5 hover:text-primary transition underline underline-offset-4"
             >
               <SwitchCamera className="w-3.5 h-3.5" />
-              Trocar lente (0.5x / 1x)
+              Próxima lente
             </button>
           )}
         </div>
