@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Html5Qrcode,
   Html5QrcodeSupportedFormats,
+  type Html5QrcodeCameraScanConfig,
   type CameraDevice,
 } from 'html5-qrcode';
 import {
@@ -61,7 +62,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
   // Inicia ou troca a câmera ativa
   const startCamera = useCallback(
-    async (cameraIdOrConstraints?: string | MediaTrackConstraints) => {
+    async (preferredCameraId?: string) => {
       try {
         setIsSwitchingCamera(true);
         setCameraError(null);
@@ -80,7 +81,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             formatsToSupport: [
               Html5QrcodeSupportedFormats.QR_CODE,
               Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.EAN_13,
             ],
             experimentalFeatures: {
               useBarCodeDetectorIfSupported: true,
@@ -91,23 +91,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
         const scanner = scannerRef.current;
 
-        // Configuração com alta resolução e foco contínuo para evitar câmera desfocada
-        const config = {
-          fps: 20,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.75);
-            return { width: edge, height: edge };
-          },
-          aspectRatio: 1.0,
-          videoConstraints: {
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            facingMode: { ideal: 'environment' },
-            advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
-          },
+        // Configuração de varredura:
+        // IMPORTANTE: NÃO usamos qrbox para não recortar a imagem da câmera!
+        // Sem qrbox, o leitor escaneia 100% dos pixels do vídeo em resolução nativa.
+        const config: Html5QrcodeCameraScanConfig = {
+          fps: 10,
+          disableFlip: false,
         };
 
-        const target = cameraIdOrConstraints || { facingMode: 'environment' };
+        const target = preferredCameraId
+          ? preferredCameraId
+          : { facingMode: 'environment' };
 
         await scanner.start(
           target,
@@ -122,15 +116,23 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           }
         );
 
+        // Tenta aplicar foco contínuo na stream ativa
+        try {
+          await scanner.applyVideoConstraints({
+            advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
+          });
+        } catch {
+          // Navegador pode não suportar focusMode contínuo
+        }
+
         // Atualiza a lista de câmeras disponíveis para permitir troca de lentes
         try {
           const cameras = await Html5Qrcode.getCameras();
           if (cameras && cameras.length > 0) {
             setAvailableCameras(cameras);
-            if (typeof cameraIdOrConstraints === 'string') {
-              setActiveCameraId(cameraIdOrConstraints);
+            if (preferredCameraId) {
+              setActiveCameraId(preferredCameraId);
             } else {
-              // Tenta identificar se há câmera traseira padrão
               const backCameras = cameras.filter(
                 (c) =>
                   !c.label.toLowerCase().includes('front') &&
@@ -138,13 +140,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                   !c.label.toLowerCase().includes('selfie')
               );
               if (backCameras.length > 0) {
-                // Se a primeira câmera for ultra-wide (0.5x), prioriza a segunda se houver
-                const isFirstUltraWide =
+                // Se a primeira for ultra-wide/0.5x, tenta usar a segunda
+                const isFirstUltra =
                   backCameras[0].label.toLowerCase().includes('ultra') ||
                   backCameras[0].label.toLowerCase().includes('0.5') ||
                   backCameras[0].label.toLowerCase().includes('wide-angle');
 
-                if (isFirstUltraWide && backCameras.length > 1) {
+                if (isFirstUltra && backCameras.length > 1) {
                   setActiveCameraId(backCameras[1].id);
                 } else {
                   setActiveCameraId(backCameras[0].id);
@@ -158,7 +160,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           // Ignora erro de enumeração
         }
 
-        // Detecta capacidades de Zoom e Lanterna
+        // Detecta capacidades de Zoom e Lanterna da lente aberta
         try {
           const cameraCaps = scanner.getRunningTrackCameraCapabilities();
           const zoomFeature = cameraCaps?.zoomFeature?.();
@@ -187,7 +189,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         setCameraError(
           errorName === 'NotAllowedError'
             ? 'Permissão de acesso à câmera negada. Permita nas configurações do navegador.'
-            : 'Não foi possível focar ou iniciar a câmera. Use o botão "Tirar Foto com Celular" ou digite a chave.'
+            : 'Dificuldade para acessar a câmera. Use o botão "Tirar Foto com Celular" ou digite a chave.'
         );
       } finally {
         setIsSwitchingCamera(false);
@@ -272,7 +274,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
-  // Fallback: Tirar foto com o aplicativo nativo da câmera do celular
+  // Fallback Robusto: Tirar foto com o aplicativo oficial da câmera do celular
   const handleNativePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -281,9 +283,36 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     setCameraError(null);
 
     try {
+      // 1. Tenta decodificação direta via BarcodeDetector nativo no Chromium
+      if ('BarcodeDetector' in window) {
+        try {
+          const bitmap = await createImageBitmap(file);
+          // @ts-expect-error BarcodeDetector is a web standard supported in Android Chrome
+          const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await detector.detect(bitmap);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            onScanSuccess(barcodes[0].rawValue);
+            void handleStop();
+            onClose();
+            return;
+          }
+        } catch (detectorErr) {
+          console.warn(
+            'BarcodeDetector direto não encontrou, tentando Html5Qrcode...',
+            detectorErr
+          );
+        }
+      }
+
+      // 2. Se a câmera estiver ativa, para a câmera antes de chamar scanFile (exigência do Html5Qrcode)
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        await scannerRef.current.stop();
+      }
+
       if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode(readerElementId);
       }
+
       const decodedText = await scannerRef.current.scanFile(file, false);
       if (decodedText) {
         onScanSuccess(decodedText);
@@ -292,7 +321,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       }
     } catch {
       setCameraError(
-        'QR Code não identificado na foto. Certifique-se de que o código esteja bem iluminado e nítido.'
+        'QR Code não identificado na foto. Certifique-se de aproximar bem a câmera do QR Code e garantir boa iluminação.'
       );
     } finally {
       setIsScanningPhoto(false);
@@ -307,8 +336,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     void handleStop();
     onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-between p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
@@ -378,10 +405,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             <div className="scanner-laser-line absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_12px_#ef4444]" />
 
             {/* Cantoneiras Visuais */}
-            <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-primary rounded-tl-lg" />
-            <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-primary rounded-tr-lg" />
-            <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-primary rounded-bl-lg" />
-            <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-primary rounded-br-lg" />
+            <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-primary rounded-tl-lg pointer-events-none" />
+            <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-primary rounded-tr-lg pointer-events-none" />
+            <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-primary rounded-bl-lg pointer-events-none" />
+            <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-primary rounded-br-lg pointer-events-none" />
 
             {/* Feedback quando está trocando lente */}
             {isSwitchingCamera && (
@@ -476,17 +503,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isScanningPhoto}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 px-4 py-2.5 text-xs font-semibold text-white transition shadow-sm"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-500/50 px-4 py-2.5 text-xs font-semibold text-white transition shadow-lg shadow-emerald-950/40"
           >
             {isScanningPhoto ? (
               <>
-                <RotateCw className="w-4 h-4 text-primary animate-spin" />
-                <span>Processando foto do cupom...</span>
+                <RotateCw className="w-4 h-4 text-white animate-spin" />
+                <span>Decodificando foto do cupom...</span>
               </>
             ) : (
               <>
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Tirar Foto com Câmera do Celular (Foco Perfeito)</span>
+                <Camera className="w-4 h-4 text-white" />
+                <span>📸 Tirar Foto com Câmera do Celular (Foco Perfeito)</span>
               </>
             )}
           </button>

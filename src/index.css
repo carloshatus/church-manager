@@ -41,6 +41,19 @@ body {
 }
 
 /* Custom styles for camera overlay & laser animation */
+#html5-qrcode-reader-container {
+  border: none !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#html5-qrcode-reader-container video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1.5rem;
+}
+
 .scanner-laser-line {
   animation: scan-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
