@@ -97,6 +97,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [activeResolution, setActiveResolution] = useState<string | null>(null);
 
   // Zoom & Lanterna
   const [zoomSupported, setZoomSupported] = useState(false);
@@ -112,8 +113,18 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
 
+  // Controle de detecção e concorrência
+  const hasScannedRef = useRef(false);
+  const nativeScanActiveRef = useRef(false);
+  const nativeTimerRef = useRef<number | null>(null);
+
   // Parada segura do scanner
   const handleStop = useCallback(async () => {
+    nativeScanActiveRef.current = false;
+    if (nativeTimerRef.current !== null) {
+      window.clearTimeout(nativeTimerRef.current);
+      nativeTimerRef.current = null;
+    }
     if (scannerRef.current && scannerRef.current.isScanning) {
       try {
         await scannerRef.current.stop();
@@ -126,9 +137,68 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
   // Fechamento imediato da interface e parada em background
   const handleClose = useCallback(() => {
+    hasScannedRef.current = true;
     onClose();
     void handleStop();
   }, [onClose, handleStop]);
+
+  // Detector nativo de alta performance diretamente no elemento <video>
+  // O BarcodeDetector nativo no Chromium/Android lê o frame bruto de alta resolução do hardware (1080p/4K)
+  // sem passar pelo downscale de canvas do html5-qrcode.
+  const startNativeLiveDetector = useCallback(
+    (onSuccess: (code: string) => void) => {
+      if (!('BarcodeDetector' in window)) return;
+
+      try {
+        // @ts-expect-error BarcodeDetector is a modern web standard
+        const detector = new window.BarcodeDetector({
+          formats: ['qr_code', 'code_128'],
+        });
+
+        const videoEl = document.querySelector<HTMLVideoElement>(
+          `#${readerElementId} video`
+        );
+        if (!videoEl) return;
+
+        nativeScanActiveRef.current = true;
+
+        const scanFrame = async () => {
+          if (!nativeScanActiveRef.current || hasScannedRef.current) return;
+
+          if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
+            try {
+              const barcodes = await detector.detect(videoEl);
+              if (
+                !hasScannedRef.current &&
+                nativeScanActiveRef.current &&
+                barcodes &&
+                barcodes.length > 0 &&
+                barcodes[0]?.rawValue
+              ) {
+                hasScannedRef.current = true;
+                nativeScanActiveRef.current = false;
+                onSuccess(barcodes[0].rawValue);
+                return;
+              }
+            } catch {
+              // Frame intermediário ignorado
+            }
+          }
+
+          if (nativeScanActiveRef.current && !hasScannedRef.current) {
+            nativeTimerRef.current = window.setTimeout(() => {
+              void scanFrame();
+            }, 80);
+          }
+        };
+
+        void scanFrame();
+      } catch (e) {
+        console.warn('Não foi possível iniciar BarcodeDetector nativo em tempo real:', e);
+      }
+    },
+    [readerElementId]
+  );
 
   // Enumeração segura de câmeras via API nativa do navegador (sem reabrir stream)
   const enumerateCameras = useCallback(async (): Promise<CameraDevice[]> => {
@@ -146,14 +216,21 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   }, []);
 
-  // Inicia ou troca a câmera ativa
+  // Inicia ou troca a câmera ativa com suporte a Alta Resolução (Full HD 1080p)
   const startCamera = useCallback(
     async (preferredCameraId?: string) => {
       try {
         setIsSwitchingCamera(true);
         setCameraError(null);
+        hasScannedRef.current = false;
 
-        // Se já está escaneando, para a câmera anterior
+        // Se já está escaneando, para a câmera anterior e o scanner nativo
+        nativeScanActiveRef.current = false;
+        if (nativeTimerRef.current !== null) {
+          window.clearTimeout(nativeTimerRef.current);
+          nativeTimerRef.current = null;
+        }
+
         if (scannerRef.current && scannerRef.current.isScanning) {
           try {
             await scannerRef.current.stop();
@@ -177,27 +254,110 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
         const scanner = scannerRef.current;
 
-        // Sem qrbox: escaneia 100% dos pixels do vídeo nativo em alta resolução
-        const config: Html5QrcodeCameraScanConfig = {
-          fps: 10,
-          disableFlip: false,
+        const onScanHandler = (decodedText: string) => {
+          if (hasScannedRef.current) return;
+          hasScannedRef.current = true;
+          nativeScanActiveRef.current = false;
+          onScanSuccess(decodedText);
+          handleClose();
         };
 
-        const target = preferredCameraId
-          ? preferredCameraId
-          : { facingMode: 'environment' };
+        // Escaneamento em Alta Resolução (Full HD 1080p / 4K):
+        // Sem videoConstraints, browsers mobile abrem a câmera no padrão 640x480 (VGA),
+        // o que destrói a nitidez de QR Codes fiscais densos.
+        // Forçamos resolução Full HD ideal com fallback flexível para máxima nitidez e compatibilidade.
+        let started = false;
 
-        await scanner.start(
-          target,
-          config,
-          (decodedText) => {
-            onScanSuccess(decodedText);
-            handleClose();
-          },
-          () => {
-            // Callback silencioso para frames intermediários
+        // 1. Tenta com preferredCameraId em Full HD (se informada)
+        if (preferredCameraId) {
+          try {
+            const configWithPref: Html5QrcodeCameraScanConfig = {
+              fps: 15,
+              disableFlip: false,
+              videoConstraints: {
+                deviceId: { exact: preferredCameraId },
+                width: { min: 640, ideal: 1920, max: 3840 },
+                height: { min: 480, ideal: 1080, max: 2160 },
+                advanced: [
+                  { focusMode: 'continuous' } as unknown as MediaTrackConstraintSet,
+                ],
+              },
+            };
+            await scanner.start(
+              preferredCameraId,
+              configWithPref,
+              onScanHandler,
+              () => {}
+            );
+            started = true;
+          } catch (prefErr) {
+            console.warn(
+              'Falha ao iniciar câmera preferida em alta resolução, tentando câmera traseira padrão...',
+              prefErr
+            );
+            localStorage.removeItem(PREFERRED_CAMERA_KEY);
           }
-        );
+        }
+
+        // 2. Se não iniciou ainda, tenta câmera traseira (environment) em Full HD
+        if (!started) {
+          try {
+            const configBackHD: Html5QrcodeCameraScanConfig = {
+              fps: 15,
+              disableFlip: false,
+              videoConstraints: {
+                facingMode: { ideal: 'environment' },
+                width: { min: 640, ideal: 1920, max: 3840 },
+                height: { min: 480, ideal: 1080, max: 2160 },
+                advanced: [
+                  { focusMode: 'continuous' } as unknown as MediaTrackConstraintSet,
+                ],
+              },
+            };
+            await scanner.start(
+              { facingMode: 'environment' },
+              configBackHD,
+              onScanHandler,
+              () => {}
+            );
+            started = true;
+          } catch (hdErr) {
+            console.warn(
+              'Falha com constraints Full HD, tentando com resolução ideal flexível...',
+              hdErr
+            );
+          }
+        }
+
+        // 3. Fallback resiliente para webcams ou aparelhos legados
+        if (!started) {
+          const configFallback: Html5QrcodeCameraScanConfig = {
+            fps: 15,
+            disableFlip: false,
+            videoConstraints: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          };
+          await scanner.start(
+            { facingMode: 'environment' },
+            configFallback,
+            onScanHandler,
+            () => {}
+          );
+          started = true;
+        }
+
+        // Recupera e exibe a resolução real ativa da câmera
+        try {
+          const settings = scanner.getRunningTrackSettings();
+          if (settings?.width && settings?.height) {
+            setActiveResolution(`${settings.width}x${settings.height}`);
+          }
+        } catch {
+          // Ignora se não puder ler settings do track
+        }
 
         // Atualiza a lista de câmeras com segurança nativa
         const devs = await enumerateCameras();
@@ -221,7 +381,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           }
         }
 
-        // Tenta aplicar foco contínuo
+        // Tenta aplicar foco contínuo no hardware
         try {
           await scanner.applyVideoConstraints({
             advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
@@ -229,6 +389,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         } catch {
           // Foco contínuo pode não ser suportado pelo navegador
         }
+
+        // Dispara varredura direta de alta resolução via BarcodeDetector nativo no <video>
+        startNativeLiveDetector(onScanHandler);
 
         // Detecta capacidades de Zoom e Lanterna da lente aberta
         try {
@@ -266,7 +429,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         setIsSwitchingCamera(false);
       }
     },
-    [enumerateCameras, handleClose, onScanSuccess]
+    [enumerateCameras, handleClose, onScanSuccess, startNativeLiveDetector]
   );
 
   // Inicialização e limpeza ao abrir/fechar o modal
@@ -302,6 +465,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       setShowManualInput(false);
       setIsTorchOn(false);
       setCurrentZoom(1);
+      setActiveResolution(null);
+      hasScannedRef.current = false;
     };
   }, [isOpen, startCamera, handleStop, enumerateCameras]);
 
@@ -463,6 +628,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         <div className="flex items-center gap-2 text-white font-medium">
           <Camera className="w-5 h-5 text-primary animate-pulse" />
           <span className="text-sm font-semibold">Leitor de QR Code Fiscal</span>
+          {activeResolution && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              title="Resolução ativa capturada da câmera"
+            >
+              {activeResolution}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -538,6 +711,15 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             <div className="flex-1 text-xs text-slate-200 truncate px-1">
               {availableCameras.length === 1 ? activeCameraLabel : 'Detectando lentes...'}
             </div>
+          )}
+
+          {activeResolution && (
+            <span
+              className="text-[10px] font-mono font-medium text-emerald-400 bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded-lg flex-shrink-0 hidden xs:inline-block"
+              title="Resolução ativa do sensor"
+            >
+              {activeResolution}
+            </span>
           )}
 
           <button
