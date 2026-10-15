@@ -139,3 +139,9 @@ Siga rigorosamente a convenção do **Conventional Commits**:
 - `refactor:` Refatoração de código que não altera comportamento
 - `test:` Adição ou correção de testes automatizados
 - `chore:` Tarefas de manutenção, dependências ou configuração de build
+
+### 🛑 Regra Mandatória: Commits Parciais a Cada Etapa
+- **NUNCA** acumule todas as alterações de um plano para um único commit no final da tarefa.
+- A cada etapa concluída do plano (após validação com `npm run test` e `npm run lint`), crie imediatamente um commit parcial atômico correspondente à etapa (ex: `feat(domain): adicionar entidades e validador de destinatario`, `feat(sefaz): implementar parser sefaz-ba e registry`, etc.).
+- Isso garante rastreabilidade, histórico granular e simplifica a revisão e auditoria do código.
+

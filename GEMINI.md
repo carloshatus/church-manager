@@ -55,6 +55,12 @@ npm run lint  # Verifica regras do linter ESLint
 ```
 Se encontrar falhas de lint ou testes quebrados após uma alteração, corrija-os antes de apresentar a solução final.
 
+### 5. Commits Parciais a Cada Etapa (Obrigatório)
+- **NUNCA** deixe para commitar tudo apenas ao final de um plano de tarefas.
+- Execute commits parciais atômicos imediatamente após concluir e testar cada etapa do plano (ex: Domínio -> Parser -> Repositório -> Store -> UI).
+- Siga rigorosamente a convenção do Conventional Commits (`feat(...)`, `fix(...)`, `test(...)`, etc.) para cada etapa.
+
+
 ---
 
 ## 📚 Referências no Repositório
