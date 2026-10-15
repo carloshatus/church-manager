@@ -1,11 +1,61 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrasilApiAdapter } from '@/adapters/cnpj/brasil-api.adapter';
 import { MinhaReceitaAdapter } from '@/adapters/cnpj/minha-receita.adapter';
+import { CnpjWsAdapter } from '@/adapters/cnpj/cnpj-ws.adapter';
 import { CnpjService } from '@/adapters/cnpj/cnpj-service';
 import type { ICnpjProvider, CnpjDto } from '@/ports/cnpj-provider.port';
 
-describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
+describe('CNPJ Adapters: BrasilApiAdapter, MinhaReceitaAdapter & CnpjWsAdapter', () => {
   const sampleCnpj = '12345678000199';
+
+  it('CnpjWsAdapter deve normalizar resposta de sucesso', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        cnpj_raiz: '12345678',
+        razao_social: 'Livraria e Papelaria Central Ltda',
+        estabelecimento: {
+          cnpj: '12.345.678/0001-99',
+          nome_fantasia: 'Livraria Central',
+          situacao_cadastral: 'Ativa',
+          estado: { sigla: 'SP' },
+          cidade: { nome: 'São Paulo' },
+          atividade_principal: { descricao: 'Comércio varejista de livros' },
+        },
+      }),
+    });
+
+    const adapter = new CnpjWsAdapter('https://fake-cnpj-ws', 5000, mockFetch as unknown as typeof fetch);
+    const result = await adapter.fetchByCnpj(sampleCnpj);
+
+    expect(result.cnpj).toBe('12345678000199');
+    expect(result.razaoSocial).toBe('Livraria e Papelaria Central Ltda');
+    expect(result.nomeFantasia).toBe('Livraria Central');
+    expect(result.uf).toBe('SP');
+    expect(result.municipio).toBe('São Paulo');
+    expect(result.cnaeFiscalDescricao).toBe('Comércio varejista de livros');
+    expect(result.status).toBe('Ativa');
+    expect(result.provider).toBe('CnpjWs');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('CnpjWsAdapter deve lançar erro se o status HTTP não for OK com detalhes', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        status: 404,
+        titulo: 'CNPJ não encontrado',
+        detalhes: 'O CNPJ informado não consta na base de dados.',
+      }),
+    });
+
+    const adapter = new CnpjWsAdapter('https://fake-cnpj-ws', 5000, mockFetch as unknown as typeof fetch);
+    await expect(adapter.fetchByCnpj(sampleCnpj)).rejects.toThrow(
+      'CNPJ.ws retornou status HTTP 404: O CNPJ informado não consta na base de dados.'
+    );
+  });
 
   it('BrasilApiAdapter deve normalizar resposta de sucesso', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
@@ -21,7 +71,7 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
       }),
     });
 
-    const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as any);
+    const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as unknown as typeof fetch);
     const result = await adapter.fetchByCnpj(sampleCnpj);
 
     expect(result.cnpj).toBe('12345678000199');
@@ -38,7 +88,7 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
       status: 404,
     });
 
-    const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as any);
+    const adapter = new BrasilApiAdapter('https://fake-api', 5000, mockFetch as unknown as typeof fetch);
     await expect(adapter.fetchByCnpj(sampleCnpj)).rejects.toThrow(
       'BrasilAPI retornou status HTTP 404'
     );
@@ -59,7 +109,7 @@ describe('CNPJ Adapters: BrasilApiAdapter & MinhaReceitaAdapter', () => {
     const adapter = new MinhaReceitaAdapter(
       'https://fake-minha-receita',
       5000,
-      mockFetch as any
+      mockFetch as unknown as typeof fetch
     );
     const result = await adapter.fetchByCnpj(sampleCnpj);
 
@@ -171,12 +221,12 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     expect(primaryMock.fetchByCnpj).not.toHaveBeenCalled();
   });
 
-  it('deve instanciar por padrão MinhaReceita como 1º (primário) e BrasilAPI como 2º (fallback)', () => {
+  it('deve instanciar por padrão MinhaReceita como 1º (primário) e CnpjWs como 2º (fallback)', () => {
     const defaultService = new CnpjService();
     const providers = defaultService.getProviders();
 
     expect(providers).toHaveLength(2);
     expect(providers[0].name).toBe('MinhaReceita');
-    expect(providers[1].name).toBe('BrasilAPI');
+    expect(providers[1].name).toBe('CnpjWs');
   });
 });

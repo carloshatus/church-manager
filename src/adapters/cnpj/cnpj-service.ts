@@ -1,14 +1,14 @@
 import type { ICnpjProvider, CnpjDto } from '@/ports/cnpj-provider.port';
 import { MinhaReceitaAdapter } from './minha-receita.adapter';
-import { BrasilApiAdapter } from './brasil-api.adapter';
+import { CnpjWsAdapter } from './cnpj-ws.adapter';
 
 export class CnpjService {
   private providers: ICnpjProvider[];
   private cache = new Map<string, CnpjDto>();
 
   constructor(providers?: ICnpjProvider[]) {
-    // Ordem de prioridade padrão: 1º Minha Receita (mais rápido/estável), 2º BrasilAPI (contingência)
-    this.providers = providers || [new MinhaReceitaAdapter(), new BrasilApiAdapter()];
+    // Ordem de prioridade padrão: 1º Minha Receita (mais rápido/estável), 2º CNPJ.ws (contingência)
+    this.providers = providers || [new MinhaReceitaAdapter(), new CnpjWsAdapter()];
   }
 
   /**

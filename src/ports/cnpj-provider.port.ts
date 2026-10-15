@@ -6,7 +6,7 @@ export interface CnpjDto {
   municipio?: string; // Nome do município
   cnaeFiscalDescricao?: string; // Atividade econômica principal
   status?: string; // Situação cadastral (ex: "ATIVA")
-  provider: 'BrasilAPI' | 'MinhaReceita' | 'Manual';
+  provider: 'BrasilAPI' | 'MinhaReceita' | 'CnpjWs' | 'Manual';
 }
 
 export interface ICnpjProvider {
