@@ -1,12 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import jsQR from 'jsqr';
 import {
-  Html5Qrcode,
-  Html5QrcodeSupportedFormats,
-  type Html5QrcodeCameraScanConfig,
-  type CameraDevice,
-} from 'html5-qrcode';
-import {
   X,
   Camera,
   AlertCircle,
@@ -27,7 +21,27 @@ interface QrScannerModalProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
-const PREFERRED_CAMERA_KEY = 'church_manager_preferred_camera';
+interface CameraDevice {
+  id: string;
+  label: string;
+}
+
+interface BarcodeResult {
+  rawValue: string;
+  format?: string;
+}
+
+interface NativeBarcodeDetector {
+  detect: (source: ImageBitmapSource) => Promise<BarcodeResult[]>;
+}
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (options?: { formats?: string[] }): NativeBarcodeDetector;
+    };
+  }
+}
 
 function formatCameraLabel(label: string, index: number): string {
   const clean = (label || '').trim();
@@ -87,61 +101,21 @@ function formatCameraLabel(label: string, index: number): string {
   return `Câmera #${index + 1} ${clean ? `• ${clean}` : ''}`;
 }
 
-// Seleciona a lente principal (1x com autofoco mecânico) e evita a lente 0.5x (ultra-wide de foco fixo)
-function findBestBackCamera(cameras: CameraDevice[]): string | undefined {
-  if (!cameras || cameras.length === 0) return undefined;
-
-  const backCameras = cameras.filter((c) => {
-    const l = (c.label || '').toLowerCase();
-    return (
-      !l.includes('front') &&
-      !l.includes('user') &&
-      !l.includes('selfie') &&
-      !l.includes('frontal') &&
-      !l.includes('face')
-    );
-  });
-
-  const list = backCameras.length > 0 ? backCameras : cameras;
-
-  // 1. Procura câmera identificada como principal / 1x / primary
-  const mainCamera = list.find((c) => {
-    const l = (c.label || '').toLowerCase();
-    return (
-      l.includes('main') ||
-      l.includes('primary') ||
-      l.includes('principal') ||
-      l.includes('1x') ||
-      l.includes('back 0') ||
-      l.includes('camera2 0')
-    );
-  });
-  if (mainCamera) return mainCamera.id;
-
-  // 2. Filtra qualquer uma que NÃO seja ultra-wide (0.5x)
-  const nonUltraWide = list.filter((c) => {
-    const l = (c.label || '').toLowerCase();
-    return (
-      !l.includes('ultra') &&
-      !l.includes('0.5') &&
-      !l.includes('wide-angle') &&
-      !l.includes('wide angle')
-    );
-  });
-
-  if (nonUltraWide.length > 0) return nonUltraWide[0].id;
-
-  return list[0]?.id;
-}
-
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   isOpen,
   onClose,
   onScanSuccess,
 }) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const readerElementId = 'html5-qrcode-reader-container';
+
+  const streamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const nativeDetectorRef = useRef<NativeBarcodeDetector | null>(null);
+
+  const isScanningRef = useRef(false);
+  const hasScannedRef = useRef(false);
 
   const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
@@ -151,7 +125,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   // Zoom & Lanterna
   const [zoomSupported, setZoomSupported] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(1);
-  const [minZoom, setMinZoom] = useState(0.5);
+  const [minZoom, setMinZoom] = useState(1);
   const [maxZoom, setMaxZoom] = useState(3);
   const [torchSupported, setTorchSupported] = useState(false);
   const [isTorchOn, setIsTorchOn] = useState(false);
@@ -161,424 +135,260 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const [focusPulse, setFocusPulse] = useState<{ x: number; y: number } | null>(null);
 
-  // Controle de detecção e concorrência
-  const hasScannedRef = useRef(false);
-  const nativeScanActiveRef = useRef(false);
-  const nativeTimerRef = useRef<number | null>(null);
-
-  // Parada segura do scanner
-  const handleStop = useCallback(async () => {
-    nativeScanActiveRef.current = false;
-    if (nativeTimerRef.current !== null) {
-      window.clearTimeout(nativeTimerRef.current);
-      nativeTimerRef.current = null;
-    }
-    if (scannerRef.current && scannerRef.current.isScanning) {
+  // Inicializa BarcodeDetector de hardware (quando suportado nativamente)
+  useEffect(() => {
+    if ('BarcodeDetector' in window) {
       try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (e) {
-        console.warn('Erro ao encerrar scanner:', e);
+        nativeDetectorRef.current = new window.BarcodeDetector!({
+          formats: ['qr_code', 'code_128', 'code_39', 'ean_13'],
+        });
+      } catch {
+        nativeDetectorRef.current = null;
       }
     }
   }, []);
 
-  // Fechamento imediato da interface e parada em background
+  // Parada limpa da câmera e cancelamento do loop de animação
+  const stopCamera = useCallback(() => {
+    isScanningRef.current = false;
+    if (animFrameRef.current !== null) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn('Erro ao finalizar track de vídeo:', e);
+        }
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  // Fechamento seguro do modal
   const handleClose = useCallback(() => {
     hasScannedRef.current = true;
+    stopCamera();
     onClose();
-    void handleStop();
-  }, [onClose, handleStop]);
+  }, [onClose, stopCamera]);
 
-  // Varredura híbrida de ultra-alta sensibilidade e resolução direta no <video>
-  // Resolve o problema de cupons fiscais pequenos/densos (NFC-e / SAT / SEFAZ):
-  // 1. BarcodeDetector nativo de hardware (quando suportado)
-  // 2. jsQR no Recorte Central 1:1 (Center Crop) em alta resolução (600x600 pixels nítidos sem distorção)
-  // 3. jsQR no Frame Completo proporcional com suporte a inversão de cores/reflexo (attemptBoth)
-  const startHighResLiveScanner = useCallback(
-    (onSuccess: (code: string) => void) => {
-      nativeScanActiveRef.current = true;
-
-      // Canvas offscreen reutilizável para alta performance e zero memory-leaks
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-      let nativeDetector: unknown = null;
-      if ('BarcodeDetector' in window) {
-        try {
-          // @ts-expect-error BarcodeDetector is a modern web standard
-          nativeDetector = new window.BarcodeDetector();
-        } catch {
-          nativeDetector = null;
-        }
-      }
-
-      const scanLoop = async () => {
-        if (!nativeScanActiveRef.current || hasScannedRef.current) return;
-
-        const videoEl = document.querySelector<HTMLVideoElement>(
-          `#${readerElementId} video`
-        );
-
-        if (
-          videoEl &&
-          !videoEl.paused &&
-          !videoEl.ended &&
-          videoEl.readyState >= 2 &&
-          videoEl.videoWidth > 0 &&
-          videoEl.videoHeight > 0
-        ) {
-          const vw = videoEl.videoWidth;
-          const vh = videoEl.videoHeight;
-
-          // 1. Tenta com BarcodeDetector nativo no elemento <video>
-          if (nativeDetector) {
-            try {
-              // @ts-expect-error BarcodeDetector detect
-              const barcodes = await nativeDetector.detect(videoEl);
-              if (
-                !hasScannedRef.current &&
-                nativeScanActiveRef.current &&
-                barcodes &&
-                barcodes.length > 0 &&
-                barcodes[0]?.rawValue
-              ) {
-                hasScannedRef.current = true;
-                nativeScanActiveRef.current = false;
-                onSuccess(barcodes[0].rawValue);
-                return;
-              }
-            } catch {
-              // segue para jsQR
-            }
-          }
-
-          // 2. jsQR no Recorte Central de Alta Resolução (Center Crop 1:1)
-          // Isso garante que mesmo um QR code pequeno no papel ocupe centenas de pixels nítidos
-          // com proporção perfeitamente quadrada (1:1) sem a distorção do CSS.
-          if (ctx) {
-            try {
-              const cropSize = Math.floor(Math.min(vw, vh) * 0.72);
-              const targetSize = Math.min(cropSize, 640);
-              const sx = Math.floor((vw - cropSize) / 2);
-              const sy = Math.floor((vh - cropSize) / 2);
-
-              canvas.width = targetSize;
-              canvas.height = targetSize;
-              ctx.drawImage(
-                videoEl,
-                sx,
-                sy,
-                cropSize,
-                cropSize,
-                0,
-                0,
-                targetSize,
-                targetSize
-              );
-
-              const imgData = ctx.getImageData(0, 0, targetSize, targetSize);
-              const qr = jsQR(imgData.data, targetSize, targetSize, {
-                inversionAttempts: 'attemptBoth',
-              });
-
-              if (
-                qr &&
-                qr.data &&
-                !hasScannedRef.current &&
-                nativeScanActiveRef.current
-              ) {
-                hasScannedRef.current = true;
-                nativeScanActiveRef.current = false;
-                onSuccess(qr.data);
-                return;
-              }
-            } catch {
-              // segue para o próximo passo
-            }
-
-            // 3. jsQR no Frame Proporcional Completo (caso o QR Code esteja mais perto da borda)
-            try {
-              const fullW = 480;
-              const fullH = Math.floor((vh / vw) * fullW);
-              canvas.width = fullW;
-              canvas.height = fullH;
-              ctx.drawImage(videoEl, 0, 0, vw, vh, 0, 0, fullW, fullH);
-
-              const fullImgData = ctx.getImageData(0, 0, fullW, fullH);
-              const fullQr = jsQR(fullImgData.data, fullW, fullH, {
-                inversionAttempts: 'attemptBoth',
-              });
-
-              if (
-                fullQr &&
-                fullQr.data &&
-                !hasScannedRef.current &&
-                nativeScanActiveRef.current
-              ) {
-                hasScannedRef.current = true;
-                nativeScanActiveRef.current = false;
-                onSuccess(fullQr.data);
-                return;
-              }
-            } catch {
-              // segue para próximo ciclo
-            }
-          }
-        }
-
-        if (nativeScanActiveRef.current && !hasScannedRef.current) {
-          nativeTimerRef.current = window.setTimeout(() => {
-            void scanLoop();
-          }, 85);
-        }
-      };
-
-      void scanLoop();
+  // Sucesso na leitura do código
+  const handleSuccess = useCallback(
+    (decodedText: string) => {
+      if (hasScannedRef.current) return;
+      hasScannedRef.current = true;
+      isScanningRef.current = false;
+      stopCamera();
+      onScanSuccess(decodedText);
+      onClose();
     },
-    [readerElementId]
+    [onClose, onScanSuccess, stopCamera]
   );
 
-  // Enumeração segura de câmeras via API nativa do navegador (sem reabrir stream)
-  const enumerateCameras = useCallback(async (): Promise<CameraDevice[]> => {
-    if (!navigator.mediaDevices?.enumerateDevices) return [];
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-      return videoDevices.map((d, index) => ({
-        id: d.deviceId,
-        label: d.label || `Câmera ${index + 1}`,
-      }));
-    } catch (e) {
-      console.warn('Erro ao enumerar dispositivos de vídeo:', e);
-      return [];
-    }
-  }, []);
+  const scanFrameRef = useRef<() => void>(() => {});
 
-  // Inicia ou troca a câmera ativa com suporte a Alta Resolução (Full HD 1080p)
+  // Loop contínuo de leitura de frames (padrão idêntico e direto de calculate-bills-v0)
+  const scanFrame = useCallback(() => {
+    if (!isScanningRef.current || hasScannedRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (
+      !video ||
+      !canvas ||
+      video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA ||
+      video.videoWidth === 0 ||
+      video.videoHeight === 0
+    ) {
+      if (isScanningRef.current && !hasScannedRef.current) {
+        animFrameRef.current = requestAnimationFrame(() => scanFrameRef.current());
+      }
+      return;
+    }
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // 1. Tenta detecção acelerada por hardware via BarcodeDetector nativo (Chrome Android)
+    if (nativeDetectorRef.current) {
+      nativeDetectorRef.current
+        .detect(video)
+        .then((barcodes) => {
+          if (
+            !hasScannedRef.current &&
+            isScanningRef.current &&
+            barcodes &&
+            barcodes.length > 0 &&
+            barcodes[0]?.rawValue
+          ) {
+            handleSuccess(barcodes[0].rawValue);
+          }
+        })
+        .catch(() => {
+          // Continua para o jsQR
+        });
+    }
+
+    // 2. Leitura com jsQR em resolução nativa direta no Canvas (modelo idêntico a calculate-bills-v0)
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (ctx) {
+      try {
+        canvas.width = vw;
+        canvas.height = vh;
+        ctx.drawImage(video, 0, 0, vw, vh);
+
+        const imageData = ctx.getImageData(0, 0, vw, vh);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert',
+        });
+
+        if (code?.data && !hasScannedRef.current && isScanningRef.current) {
+          handleSuccess(code.data);
+          return;
+        }
+      } catch {
+        // Ignora erros transitórios de frame
+      }
+    }
+
+    if (isScanningRef.current && !hasScannedRef.current) {
+      animFrameRef.current = requestAnimationFrame(() => scanFrameRef.current());
+    }
+  }, [handleSuccess]);
+
+  useEffect(() => {
+    scanFrameRef.current = scanFrame;
+  }, [scanFrame]);
+
+  // Inicia ou alterna a câmera ativa com WebRTC nativo
   const startCamera = useCallback(
     async (preferredCameraId?: string) => {
       try {
         setIsSwitchingCamera(true);
         setCameraError(null);
+        stopCamera();
         hasScannedRef.current = false;
 
-        // Se já está escaneando, para a câmera anterior e o scanner nativo
-        nativeScanActiveRef.current = false;
-        if (nativeTimerRef.current !== null) {
-          window.clearTimeout(nativeTimerRef.current);
-          nativeTimerRef.current = null;
-        }
+        let stream: MediaStream | null = null;
 
-        if (scannerRef.current && scannerRef.current.isScanning) {
-          try {
-            await scannerRef.current.stop();
-          } catch {
-            // Ignora erro de transição
-          }
-        }
-
-        if (!scannerRef.current) {
-          scannerRef.current = new Html5Qrcode(readerElementId, {
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.QR_CODE,
-              Html5QrcodeSupportedFormats.CODE_128,
-            ],
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true,
-            },
-            verbose: false,
-          });
-        }
-
-        const scanner = scannerRef.current;
-
-        const onScanHandler = (decodedText: string) => {
-          if (hasScannedRef.current) return;
-          hasScannedRef.current = true;
-          nativeScanActiveRef.current = false;
-          onScanSuccess(decodedText);
-          handleClose();
-        };
-
-        // Escaneamento em Alta Resolução (Full HD 1080p / 4K):
-        // Sem videoConstraints, browsers mobile abrem a câmera no padrão 640x480 (VGA),
-        // o que destrói a nitidez de QR Codes fiscais densos.
-        // Forçamos resolução Full HD ideal com fallback flexível para máxima nitidez e compatibilidade.
-        let started = false;
-
-        // 1. Tenta com preferredCameraId em Full HD (se informada)
+        // 1. Tenta com preferredCameraId (se informado pelo usuário)
         if (preferredCameraId) {
           try {
-            const configWithPref: Html5QrcodeCameraScanConfig = {
-              fps: 15,
-              disableFlip: false,
-              videoConstraints: {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
                 deviceId: { exact: preferredCameraId },
-                width: { min: 640, ideal: 1920, max: 3840 },
-                height: { min: 480, ideal: 1080, max: 2160 },
-                advanced: [
-                  { focusMode: 'continuous' } as unknown as MediaTrackConstraintSet,
-                ],
               },
-            };
-            await scanner.start(
-              preferredCameraId,
-              configWithPref,
-              onScanHandler,
-              () => {}
-            );
-            started = true;
+              audio: false,
+            });
           } catch (prefErr) {
             console.warn(
-              'Falha ao iniciar câmera preferida em alta resolução, tentando câmera traseira padrão...',
+              'Falha ao abrir câmera com deviceId específico, usando padrão traseira...',
               prefErr
             );
-            localStorage.removeItem(PREFERRED_CAMERA_KEY);
           }
         }
 
-        // 2. Se não iniciou ainda, tenta câmera traseira (environment) em Full HD
-        if (!started) {
+        // 2. Se não abriu, usa a câmera traseira padrão (environment)
+        if (!stream) {
           try {
-            const configBackHD: Html5QrcodeCameraScanConfig = {
-              fps: 15,
-              disableFlip: false,
-              videoConstraints: {
-                facingMode: { ideal: 'environment' },
-                width: { min: 640, ideal: 1920, max: 3840 },
-                height: { min: 480, ideal: 1080, max: 2160 },
-                advanced: [
-                  { focusMode: 'continuous' } as unknown as MediaTrackConstraintSet,
-                ],
-              },
-            };
-            await scanner.start(
-              { facingMode: 'environment' },
-              configBackHD,
-              onScanHandler,
-              () => {}
-            );
-            started = true;
-          } catch (hdErr) {
-            console.warn(
-              'Falha com constraints Full HD, tentando com resolução ideal flexível...',
-              hdErr
-            );
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' } },
+              audio: false,
+            });
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' },
+              audio: false,
+            });
           }
         }
 
-        // 3. Fallback resiliente para webcams ou aparelhos legados
-        if (!started) {
-          const configFallback: Html5QrcodeCameraScanConfig = {
-            fps: 15,
-            disableFlip: false,
-            videoConstraints: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-          };
-          await scanner.start(
-            { facingMode: 'environment' },
-            configFallback,
-            onScanHandler,
-            () => {}
-          );
-          started = true;
-        }
+        streamRef.current = stream;
 
-        // Recupera e exibe a resolução real ativa da câmera
-        try {
-          const settings = scanner.getRunningTrackSettings();
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          const settings = track.getSettings?.();
           if (settings?.width && settings?.height) {
             setActiveResolution(`${settings.width}x${settings.height}`);
           }
-        } catch {
-          // Ignora se não puder ler settings do track
-        }
-
-        // Atualiza a lista de câmeras com segurança nativa
-        const devs = await enumerateCameras();
-        if (devs.length > 0) {
-          setAvailableCameras(devs);
-
-          // Tenta recuperar o ID exato da câmera ativa
-          try {
-            const settings = scanner.getRunningTrackSettings();
-            if (settings?.deviceId) {
-              setActiveCameraId(settings.deviceId);
-              localStorage.setItem(PREFERRED_CAMERA_KEY, settings.deviceId);
-            } else if (preferredCameraId) {
-              setActiveCameraId(preferredCameraId);
-              localStorage.setItem(PREFERRED_CAMERA_KEY, preferredCameraId);
-            }
-          } catch {
-            if (preferredCameraId) {
-              setActiveCameraId(preferredCameraId);
-            }
+          if (settings?.deviceId) {
+            setActiveCameraId(settings.deviceId);
           }
-        }
 
-        // Tenta aplicar foco contínuo no hardware
-        try {
-          await scanner.applyVideoConstraints({
-            advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
-          });
-        } catch {
-          // Foco contínuo pode não ser suportado pelo navegador
-        }
+          // Foco contínuo nativo (se suportado pelo hardware)
+          try {
+            await track.applyConstraints({
+              advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+            });
+          } catch {
+            // Focus contínuo pode não ser suportado
+          }
 
-        // Dispara varredura híbrida de alta resolução em tempo real (Center Crop 1:1 + Full Frame + jsQR + BarcodeDetector)
-        startHighResLiveScanner(onScanHandler);
+          // Detecta capacidades de Lanterna e Zoom da lente ativa
+          try {
+            const caps = track.getCapabilities?.() as
+              | {
+                  zoom?: { min?: number; max?: number };
+                  torch?: boolean;
+                }
+              | undefined;
 
-        // Detecta capacidades de Zoom e Lanterna da lente aberta
-        try {
-          const trackCaps =
-            (
-              scanner as unknown as {
-                getRunningTrackCapabilities?: () => MediaTrackCapabilities;
-              }
-            ).getRunningTrackCapabilities?.() || {};
+            if (caps?.torch) {
+              setTorchSupported(true);
+            } else {
+              setTorchSupported(false);
+            }
 
-          if ('zoom' in trackCaps && (trackCaps as Record<string, unknown>).zoom) {
-            const zCap = (
-              trackCaps as unknown as { zoom: { min?: number; max?: number } }
-            ).zoom;
-            setZoomSupported(true);
-            setMinZoom(Math.max(1, zCap?.min || 1));
-            setMaxZoom(Math.min(5, zCap?.max || 3));
-            setCurrentZoom(1);
-          } else {
-            const cameraCaps = scanner.getRunningTrackCameraCapabilities();
-            const zoomFeature = cameraCaps?.zoomFeature?.();
-            if (zoomFeature && zoomFeature.isSupported()) {
+            if (caps?.zoom && caps.zoom.max && caps.zoom.max > 1) {
               setZoomSupported(true);
-              setMinZoom(Math.max(1, zoomFeature.min()));
-              setMaxZoom(Math.min(4, zoomFeature.max()));
-              setCurrentZoom(zoomFeature.value() || 1);
+              setMinZoom(caps.zoom.min ?? 1);
+              setMaxZoom(Math.min(5, caps.zoom.max));
+              setCurrentZoom(1);
             } else {
               setZoomSupported(false);
             }
-          }
-
-          const torchFeature = scanner
-            .getRunningTrackCameraCapabilities()
-            ?.torchFeature?.();
-          if (torchFeature && torchFeature.isSupported()) {
-            setTorchSupported(true);
-            setIsTorchOn(torchFeature.value() || false);
-          } else {
+          } catch {
             setTorchSupported(false);
+            setZoomSupported(false);
           }
-        } catch {
-          setZoomSupported(false);
-          setTorchSupported(false);
         }
+
+        // Enumera dispositivos após permissão concedida
+        if (navigator.mediaDevices?.enumerateDevices) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevs = devices
+              .filter((d) => d.kind === 'videoinput')
+              .map((d, index) => ({
+                id: d.deviceId,
+                label: d.label || `Câmera ${index + 1}`,
+              }));
+            if (videoDevs.length > 0) {
+              setAvailableCameras(videoDevs);
+            }
+          } catch {
+            // Ignora erro de enumeração
+          }
+        }
+
+        // Inicia escaneamento em tempo real
+        isScanningRef.current = true;
+        animFrameRef.current = requestAnimationFrame(() => scanFrameRef.current());
       } catch (err: unknown) {
-        console.warn('Falha ao iniciar câmera:', err);
-        const errorName = (err as Error)?.name;
+        console.warn('Erro ao iniciar câmera:', err);
+        const errorName = (err as DOMException)?.name;
         setCameraError(
           errorName === 'NotAllowedError'
             ? 'Permissão de acesso à câmera negada. Permita nas configurações do navegador.'
@@ -588,34 +398,29 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         setIsSwitchingCamera(false);
       }
     },
-    [enumerateCameras, handleClose, onScanSuccess, startHighResLiveScanner]
+    [stopCamera]
   );
 
   // Inicialização e limpeza ao abrir/fechar o modal
   useEffect(() => {
     if (!isOpen) {
-      void handleStop();
+      stopCamera();
       return;
     }
 
     let isMounted = true;
-    const savedCamId = localStorage.getItem(PREFERRED_CAMERA_KEY) || undefined;
 
-    // Detecta câmeras e prioriza automaticamente a lente principal traseira (1x)
-    void (async () => {
-      const devs = await enumerateCameras();
-      if (isMounted && devs.length > 0) {
-        setAvailableCameras(devs);
-      }
-      const initialCameraId = savedCamId || findBestBackCamera(devs);
+    // Timeout mínimo para garantir renderização do elemento <video>
+    const timeoutId = setTimeout(() => {
       if (isMounted) {
-        void startCamera(initialCameraId);
+        void startCamera();
       }
-    })();
+    }, 50);
 
     return () => {
       isMounted = false;
-      void handleStop();
+      clearTimeout(timeoutId);
+      stopCamera();
       setCameraError(null);
       setManualInput('');
       setShowManualInput(false);
@@ -624,9 +429,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       setActiveResolution(null);
       hasScannedRef.current = false;
     };
-  }, [isOpen, startCamera, handleStop, enumerateCameras]);
+  }, [isOpen, startCamera, stopCamera]);
 
-  // Atalho da tecla Escape para fechar
+  // Tecla Escape para fechar
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -642,11 +447,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const handleSelectCamera = async (newCameraId: string) => {
     if (!newCameraId || newCameraId === activeCameraId || isSwitchingCamera) return;
     setActiveCameraId(newCameraId);
-    localStorage.setItem(PREFERRED_CAMERA_KEY, newCameraId);
     await startCamera(newCameraId);
   };
 
-  // Alterna ciclicamente entre as câmeras / lentes traseiras do celular
+  // Alterna ciclicamente entre as câmeras / lentes traseiras
   const handleSwitchCameraCycle = async () => {
     if (availableCameras.length <= 1 || isSwitchingCamera) return;
 
@@ -654,7 +458,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       (c) =>
         !c.label.toLowerCase().includes('front') &&
         !c.label.toLowerCase().includes('user') &&
-        !c.label.toLowerCase().includes('selfie')
+        !c.label.toLowerCase().includes('selfie') &&
+        !c.label.toLowerCase().includes('frontal')
     );
 
     const list = backCameras.length > 1 ? backCameras : availableCameras;
@@ -667,18 +472,26 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
-  // Re-detecta dispositivos manualmente caso o usuário queira
+  // Atualiza lista de câmeras manualmente
   const handleRefreshCameras = async () => {
-    const devs = await enumerateCameras();
-    if (devs.length > 0) {
-      setAvailableCameras(devs);
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevs = devices
+        .filter((d) => d.kind === 'videoinput')
+        .map((d, index) => ({
+          id: d.deviceId,
+          label: d.label || `Câmera ${index + 1}`,
+        }));
+      if (videoDevs.length > 0) {
+        setAvailableCameras(videoDevs);
+      }
+    } catch {
+      // Ignora erro
     }
   };
 
-  // Estado para efeito visual de foco no toque
-  const [focusPulse, setFocusPulse] = useState<{ x: number; y: number } | null>(null);
-
-  // Força re-foco do hardware e exibe feedback tátil/visual
+  // Força foco com toque na tela
   const handleRefocus = useCallback(async (e?: React.MouseEvent<HTMLDivElement>) => {
     if (e) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -687,36 +500,26 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       setFocusPulse({ x, y });
       setTimeout(() => setFocusPulse(null), 1000);
     }
-    if (!scannerRef.current) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
     try {
-      await scannerRef.current.applyVideoConstraints({
-        advanced: [{ focusMode: 'continuous' } as unknown as MediaTrackConstraintSet],
+      await track.applyConstraints({
+        advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
       });
     } catch {
-      // Ignora se hardware não expuser refocus manual
+      // Ignora se não suportado
     }
   }, []);
 
-  // Ajusta o nível de zoom (suporta WebRTC padrão e wrapper html5-qrcode)
+  // Ajusta zoom da câmera
   const handleApplyZoom = async (zoomValue: number) => {
-    if (!scannerRef.current) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
     try {
-      await scannerRef.current.applyVideoConstraints({
-        advanced: [{ zoom: zoomValue } as unknown as MediaTrackConstraintSet],
+      await track.applyConstraints({
+        advanced: [{ zoom: zoomValue } as MediaTrackConstraintSet],
       });
       setCurrentZoom(zoomValue);
-      return;
-    } catch {
-      // fallback
-    }
-
-    try {
-      const caps = scannerRef.current.getRunningTrackCameraCapabilities();
-      const zoom = caps?.zoomFeature?.();
-      if (zoom && zoom.isSupported()) {
-        await zoom.apply(zoomValue);
-        setCurrentZoom(zoomValue);
-      }
     } catch (e) {
       console.warn('Falha ao aplicar zoom:', e);
     }
@@ -724,21 +527,20 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
   // Liga/desliga lanterna
   const handleToggleTorch = async () => {
-    if (!scannerRef.current) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
     try {
-      const caps = scannerRef.current.getRunningTrackCameraCapabilities();
-      const torch = caps?.torchFeature?.();
-      if (torch && torch.isSupported()) {
-        const nextState = !isTorchOn;
-        await torch.apply(nextState);
-        setIsTorchOn(nextState);
-      }
+      const nextState = !isTorchOn;
+      await track.applyConstraints({
+        advanced: [{ torch: nextState } as MediaTrackConstraintSet],
+      });
+      setIsTorchOn(nextState);
     } catch (e) {
       console.warn('Falha ao acionar lanterna:', e);
     }
   };
 
-  // Fallback: Tirar foto com o aplicativo oficial da câmera do celular (alta resolução + autofoco)
+  // Fallback: Tirar foto com o aplicativo oficial da câmera do celular
   const handleNativePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -747,66 +549,44 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     setCameraError(null);
 
     try {
-      // 1. Decodificação de altíssima precisão com jsQR no bitmap da foto
-      try {
-        const bitmap = await createImageBitmap(file);
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (ctx) {
-          ctx.drawImage(bitmap, 0, 0);
-          const imgData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
-          const qr = jsQR(imgData.data, bitmap.width, bitmap.height, {
-            inversionAttempts: 'attemptBoth',
-          });
-          if (qr && qr.data) {
-            onScanSuccess(qr.data);
-            handleClose();
-            return;
-          }
-        }
-      } catch (photoErr) {
-        console.warn('jsQR no bitmap da foto falhou:', photoErr);
-      }
+      const bitmap = await createImageBitmap(file);
 
-      // 2. BarcodeDetector nativo no bitmap
-      if ('BarcodeDetector' in window) {
+      // 1. Hardware BarcodeDetector
+      if (nativeDetectorRef.current) {
         try {
-          const bitmap = await createImageBitmap(file);
-          // @ts-expect-error BarcodeDetector is a web standard supported in Android Chrome
-          const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-          const barcodes = await detector.detect(bitmap);
-          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-            onScanSuccess(barcodes[0].rawValue);
-            handleClose();
+          const barcodes = await nativeDetectorRef.current.detect(bitmap);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            handleSuccess(barcodes[0].rawValue);
             return;
           }
-        } catch (detectorErr) {
-          console.warn(
-            'BarcodeDetector direto não encontrou, tentando Html5Qrcode...',
-            detectorErr
-          );
+        } catch {
+          // Continua para jsQR
         }
       }
 
-      // 3. Para a câmera antes de scanFile (requisito do Html5Qrcode)
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        await scannerRef.current.stop();
+      // 2. jsQR no Canvas da foto
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        ctx.drawImage(bitmap, 0, 0);
+        const imgData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+        const qr = jsQR(imgData.data, bitmap.width, bitmap.height, {
+          inversionAttempts: 'attemptBoth',
+        });
+        if (qr && qr.data) {
+          handleSuccess(qr.data);
+          return;
+        }
       }
 
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(readerElementId);
-      }
-
-      const decodedText = await scannerRef.current.scanFile(file, false);
-      if (decodedText) {
-        onScanSuccess(decodedText);
-        handleClose();
-      }
-    } catch {
       setCameraError(
         'QR Code não identificado na foto. Certifique-se de aproximar bem a câmera do QR Code e garantir boa iluminação.'
+      );
+    } catch {
+      setCameraError(
+        'Não foi possível processar a foto. Tente novamente ou digite a chave.'
       );
     } finally {
       setIsScanningPhoto(false);
@@ -817,16 +597,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
-    onScanSuccess(manualInput.trim());
-    handleClose();
+    handleSuccess(manualInput.trim());
   };
 
-  // REGRA CRÍTICA: Se isOpen for false, o componente não renderiza NADA no DOM
   if (!isOpen) {
     return null;
   }
 
-  // Identifica a câmera atual formatada
   const activeCameraObj = availableCameras.find((c) => c.id === activeCameraId);
   const activeCameraLabel = activeCameraObj
     ? formatCameraLabel(activeCameraObj.label, availableCameras.indexOf(activeCameraObj))
@@ -898,7 +675,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
       {/* Main Viewport do Scanner com Seletor Explícito de Câmeras */}
       <div className="w-full max-w-sm flex flex-col items-center justify-center my-auto px-2">
-        {/* BARRA DE SELEÇÃO DE CÂMERA (Visível sempre que a câmera estiver pronta ou detectando) */}
+        {/* BARRA DE SELEÇÃO DE CÂMERA */}
         <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex items-center justify-between gap-2 shadow-lg mb-3">
           <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium flex-shrink-0">
             <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
@@ -950,7 +727,15 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
               className="relative w-full aspect-square overflow-hidden rounded-3xl border-2 border-primary/50 shadow-2xl bg-black cursor-pointer select-none"
               title="Toque no visor para re-focar"
             >
-              <div id={readerElementId} className="w-full h-full" />
+              {/* Elemento de vídeo direto com WebRTC (PlaysInline para iOS Safari e Android) */}
+              <video
+                ref={videoRef}
+                playsInline
+                autoPlay
+                muted
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
 
               {/* Linha animada do Laser */}
               <div className="scanner-laser-line absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_12px_#ef4444]" />
