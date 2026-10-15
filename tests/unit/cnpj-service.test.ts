@@ -212,6 +212,51 @@ describe('CnpjService: Orquestrador com Fallback Resiliente & Cache', () => {
     expect(service.getCacheSize()).toBe(0);
   });
 
+  it('deve forçar nova consulta de rede quando forceRefresh for verdadeiro', async () => {
+    const data1: CnpjDto = {
+      cnpj: sampleCnpj,
+      razaoSocial: 'Versão Inicial',
+      provider: 'BrasilAPI',
+    };
+    const data2: CnpjDto = {
+      cnpj: sampleCnpj,
+      razaoSocial: 'Versão Atualizada Oficial',
+      provider: 'BrasilAPI',
+    };
+
+    (primaryMock.fetchByCnpj as any)
+      .mockResolvedValueOnce(data1)
+      .mockResolvedValueOnce(data2);
+
+    const service = new CnpjService([primaryMock, fallbackMock]);
+
+    const res1 = await service.resolveCnpj(sampleCnpj);
+    expect(res1.razaoSocial).toBe('Versão Inicial');
+    expect(primaryMock.fetchByCnpj).toHaveBeenCalledTimes(1);
+
+    // Consulta com forceRefresh: true deve chamar a rede novamente
+    const res2 = await service.resolveCnpj(sampleCnpj, { forceRefresh: true });
+    expect(res2.razaoSocial).toBe('Versão Atualizada Oficial');
+    expect(primaryMock.fetchByCnpj).toHaveBeenCalledTimes(2);
+  });
+
+  it('deve invalidar cache para um CNPJ específico via invalidateCache', async () => {
+    const data: CnpjDto = {
+      cnpj: sampleCnpj,
+      razaoSocial: 'Empresa Teste',
+      provider: 'BrasilAPI',
+    };
+
+    (primaryMock.fetchByCnpj as any).mockResolvedValue(data);
+
+    const service = new CnpjService([primaryMock, fallbackMock]);
+    await service.resolveCnpj(sampleCnpj);
+    expect(service.getCacheSize()).toBe(1);
+
+    service.invalidateCache(sampleCnpj);
+    expect(service.getCacheSize()).toBe(0);
+  });
+
   it('deve validar o formato do CNPJ e rejeitar entradas que não contenham 14 dígitos', async () => {
     const service = new CnpjService([primaryMock, fallbackMock]);
 

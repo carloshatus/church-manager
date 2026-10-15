@@ -11,6 +11,7 @@ import {
   FileText,
   RefreshCw,
   Camera,
+  Pencil,
 } from 'lucide-react';
 import { invoiceRepository } from '@/adapters/storage/dexie-invoice.repository';
 
@@ -19,6 +20,7 @@ interface InvoiceDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onInvoiceUpdated?: () => void;
+  onEditInvoice?: (invoice: Invoice) => void;
 }
 
 export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
@@ -26,6 +28,7 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
   isOpen,
   onClose,
   onInvoiceUpdated,
+  onEditInvoice,
 }) => {
   const [copiedKey, setCopiedKey] = useState(false);
   const [isUpdatingSync, setIsUpdatingSync] = useState(false);
@@ -204,19 +207,35 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
             Cadastrado em: {new Date(invoice.createdAt).toLocaleString('pt-BR')}
           </span>
 
-          <button
-            type="button"
-            onClick={handleToggleSyncStatus}
-            disabled={isUpdatingSync}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isUpdatingSync ? 'animate-spin' : ''}`}
-            />
-            {invoice.syncStatus === 'PENDING_SYNC'
-              ? 'Marcar como Sincronizado'
-              : 'Marcar como Pendente'}
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {onEditInvoice && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEditInvoice(invoice);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Editar Nota
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleSyncStatus}
+              disabled={isUpdatingSync}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isUpdatingSync ? 'animate-spin' : ''}`}
+              />
+              {invoice.syncStatus === 'PENDING_SYNC'
+                ? 'Marcar como Sincronizado'
+                : 'Marcar como Pendente'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

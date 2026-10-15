@@ -7,6 +7,7 @@ import { InvoiceCard } from '@/components/invoices/invoice-card';
 import { MetricCards } from '@/components/dashboard/metric-cards';
 import { FiltersBar, type FilterState } from '@/components/dashboard/filters-bar';
 import { InvoiceDetailsDialog } from '@/components/invoices/invoice-details-dialog';
+import { EditInvoiceDialog } from '@/components/invoices/edit-invoice-dialog';
 import { PlusCircle, FileQuestion } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -23,6 +24,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   });
 
   const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] =
+    useState<Invoice | null>(null);
+  const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] =
     useState<Invoice | null>(null);
 
   // Consulta reativa ao IndexedDB via useLiveQuery
@@ -107,6 +110,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               invoice={invoice}
               onDelete={handleDelete}
               onViewDetails={(inv) => setSelectedInvoiceForDetails(inv)}
+              onEdit={(inv) => setSelectedInvoiceForEdit(inv)}
             />
           ))}
         </div>
@@ -145,6 +149,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isOpen={Boolean(selectedInvoiceForDetails)}
         invoice={selectedInvoiceForDetails}
         onClose={() => setSelectedInvoiceForDetails(null)}
+        onEditInvoice={(inv) => setSelectedInvoiceForEdit(inv)}
+      />
+
+      {/* Modal de Edição da Nota Fiscal */}
+      <EditInvoiceDialog
+        isOpen={Boolean(selectedInvoiceForEdit)}
+        invoice={selectedInvoiceForEdit}
+        onClose={() => setSelectedInvoiceForEdit(null)}
+        onInvoiceSaved={(updated) => {
+          setSelectedInvoiceForEdit(null);
+          if (selectedInvoiceForDetails?.id === updated.id) {
+            setSelectedInvoiceForDetails(updated);
+          }
+        }}
       />
     </div>
   );

@@ -2,19 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { Invoice } from '@/domain/entities/invoice';
 import { StatusBadge } from './status-badge';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
-import { Calendar, Trash2, Eye, Building2, ChevronRight } from 'lucide-react';
+import { Calendar, Trash2, Eye, Building2, ChevronRight, Pencil } from 'lucide-react';
 import { PhotoPreviewDialog } from '@/components/photo/photo-preview-dialog';
 
 interface InvoiceCardProps {
   invoice: Invoice;
   onDelete?: (id: number) => void;
   onViewDetails?: (invoice: Invoice) => void;
+  onEdit?: (invoice: Invoice) => void;
 }
 
 export const InvoiceCard: React.FC<InvoiceCardProps> = ({
   invoice,
   onDelete,
   onViewDetails,
+  onEdit,
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
@@ -111,6 +113,18 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
             >
               Detalhes
               <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(invoice)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-primary hover:text-primary/90 hover:bg-primary/10 transition"
+              title="Editar Nota Fiscal"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Editar
             </button>
           )}
 

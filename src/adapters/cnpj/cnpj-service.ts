@@ -14,8 +14,12 @@ export class CnpjService {
   /**
    * Resolve dados cadastrais do CNPJ consultando os adaptadores em cascata resiliente.
    * Utiliza cache em memória para evitar requisições de rede redundantes.
+   * Se options?.forceRefresh for true, ignora o cache e força nova consulta aos provedores.
    */
-  async resolveCnpj(cnpj: string): Promise<CnpjDto> {
+  async resolveCnpj(
+    cnpj: string,
+    options?: { forceRefresh?: boolean }
+  ): Promise<CnpjDto> {
     const cleanCnpj = cnpj.replace(/\D/g, '');
 
     if (cleanCnpj.length !== 14) {
@@ -24,8 +28,10 @@ export class CnpjService {
       );
     }
 
-    // 1. Verifica cache local em memória
-    if (this.cache.has(cleanCnpj)) {
+    // 1. Verifica cache local em memória (a menos que forceRefresh seja solicitado)
+    if (options?.forceRefresh) {
+      this.cache.delete(cleanCnpj);
+    } else if (this.cache.has(cleanCnpj)) {
       return this.cache.get(cleanCnpj)!;
     }
 
@@ -58,6 +64,17 @@ export class CnpjService {
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Invalida o cache em memória para um CNPJ específico ou todo o cache
+   */
+  invalidateCache(cnpj?: string): void {
+    if (cnpj) {
+      this.cache.delete(cnpj.replace(/\D/g, ''));
+    } else {
+      this.cache.clear();
+    }
   }
 
   /**

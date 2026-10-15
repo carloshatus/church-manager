@@ -36,7 +36,7 @@ interface InvoiceFormState {
   setScanningModalOpen: (open: boolean) => void;
   setFormField: (field: keyof FormFields, value: string) => void;
   handleScannedData: (rawInput: string) => Promise<void>;
-  retryResolveCnpj: (overrideCnpj?: string) => Promise<void>;
+  retryResolveCnpj: (overrideCnpj?: string, forceRefresh?: boolean) => Promise<void>;
   handlePhotoSelected: (file: File) => Promise<void>;
   removePhoto: () => void;
   resetForm: () => void;
@@ -179,14 +179,14 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
     }
   },
 
-  retryResolveCnpj: async (overrideCnpj?: string) => {
+  retryResolveCnpj: async (overrideCnpj?: string, forceRefresh = false) => {
     const rawCnpj = overrideCnpj || get().fields.issuerCnpj;
     const cleanCnpj = rawCnpj.replace(/\D/g, '');
     if (!cleanCnpj || cleanCnpj.length !== 14) return;
 
     set({ isResolvingCnpj: true, cnpjError: null });
     try {
-      const cnpjInfo = await cnpjService.resolveCnpj(cleanCnpj);
+      const cnpjInfo = await cnpjService.resolveCnpj(cleanCnpj, { forceRefresh });
       set((state) => ({
         fields: {
           ...state.fields,

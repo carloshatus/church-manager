@@ -153,7 +153,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
               </label>
               <button
                 type="button"
-                onClick={() => retryResolveCnpj()}
+                onClick={() => retryResolveCnpj(undefined, true)}
                 disabled={
                   isResolvingCnpj || fields.issuerCnpj.replace(/\D/g, '').length !== 14
                 }
@@ -211,7 +211,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
             </div>
             <button
               type="button"
-              onClick={() => retryResolveCnpj()}
+              onClick={() => retryResolveCnpj(undefined, true)}
               disabled={isResolvingCnpj}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition flex-shrink-0"
             >

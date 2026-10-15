@@ -121,6 +121,51 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
     expect(updated?.updatedAt).toBeGreaterThan(0);
   });
 
+  it('deve permitir editar todos os campos manuais e atualizar ou remover foto', async () => {
+    const initialBlob = new Blob(['foto-original'], { type: 'image/jpeg' });
+    const id = await repository.create({
+      accessKey: '22222222222222222222222222222222222222222222',
+      type: 'NFCE',
+      issuerCnpj: '00000000000191',
+      issuerName: 'Mercado Inicial',
+      imageBlob: initialBlob,
+      sefazDataStatus: 'MANUAL',
+      syncStatus: 'PENDING_SYNC',
+    });
+
+    const newBlob = new Blob(['foto-substituida'], { type: 'image/jpeg' });
+
+    // 1. Edição de campos manuais e troca de foto
+    await repository.update(id, {
+      issuerCnpj: '11111111000199',
+      issuerName: 'Mercado Novo com Razão Oficial',
+      totalAmount: 99.9,
+      emissionDate: '2026-10-15',
+      model: '65',
+      series: '2',
+      number: '5012',
+      imageBlob: newBlob,
+    });
+
+    let record = await repository.findById(id);
+    expect(record?.issuerCnpj).toBe('11111111000199');
+    expect(record?.issuerName).toBe('Mercado Novo com Razão Oficial');
+    expect(record?.totalAmount).toBe(99.9);
+    expect(record?.emissionDate).toBe('2026-10-15');
+    expect(record?.model).toBe('65');
+    expect(record?.series).toBe('2');
+    expect(record?.number).toBe('5012');
+    expect(record?.imageBlob).toBeInstanceOf(Blob);
+
+    // 2. Remoção de foto
+    await repository.update(id, {
+      imageBlob: undefined,
+    });
+
+    record = await repository.findById(id);
+    expect(record?.imageBlob).toBeUndefined();
+  });
+
   it('deve listar notas pendentes de sincronização', async () => {
     await repository.create({
       accessKey: '10000000000000000000000000000000000000000001',
