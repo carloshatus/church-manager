@@ -15,15 +15,21 @@ import {
   Focus,
 } from 'lucide-react';
 
+import {
+  type CameraDevice,
+  formatCameraLabel,
+  isFrontCamera,
+  isUltraWideCamera,
+  findBestCamera,
+  sortCamerasForDisplay,
+  getSavedCameraPreference,
+  saveCameraPreference,
+} from '@/lib/camera-utils';
+
 interface QrScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (decodedText: string) => void;
-}
-
-interface CameraDevice {
-  id: string;
-  label: string;
 }
 
 interface BarcodeResult {
@@ -43,64 +49,6 @@ declare global {
   }
 }
 
-function formatCameraLabel(label: string, index: number): string {
-  const clean = (label || '').trim();
-  const lower = clean.toLowerCase();
-
-  const isFront =
-    lower.includes('front') ||
-    lower.includes('user') ||
-    lower.includes('selfie') ||
-    lower.includes('frontal') ||
-    lower.includes('face');
-
-  if (isFront) {
-    return `Frontal (Selfie) ${clean ? `• ${clean}` : `#${index + 1}`}`;
-  }
-
-  const isUltraWide =
-    lower.includes('ultra') ||
-    lower.includes('0.5') ||
-    lower.includes('wide-angle') ||
-    lower.includes('wide angle');
-
-  if (isUltraWide) {
-    return `Traseira 0.5x (Grande Angular) ${clean ? `• ${clean}` : `#${index + 1}`}`;
-  }
-
-  const isTele =
-    lower.includes('tele') ||
-    lower.includes('zoom') ||
-    lower.includes('2x') ||
-    lower.includes('3x');
-
-  if (isTele) {
-    return `Traseira Tele/Zoom ${clean ? `• ${clean}` : `#${index + 1}`}`;
-  }
-
-  const isMain =
-    lower.includes('main') ||
-    lower.includes('primary') ||
-    lower.includes('principal') ||
-    lower.includes('1x');
-
-  if (isMain) {
-    return `Traseira 1x (Principal) ${clean ? `• ${clean}` : `#${index + 1}`}`;
-  }
-
-  const isGenericBack =
-    lower.includes('back') ||
-    lower.includes('rear') ||
-    lower.includes('environment') ||
-    lower.includes('traseira');
-
-  if (isGenericBack) {
-    return `Traseira ${clean ? `• ${clean}` : `#${index + 1}`}`;
-  }
-
-  return `Câmera #${index + 1} ${clean ? `• ${clean}` : ''}`;
-}
-
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   isOpen,
   onClose,
@@ -116,9 +64,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
   const isScanningRef = useRef(false);
   const hasScannedRef = useRef(false);
+  const startCameraRef = useRef<(id?: string) => Promise<void>>(() =>
+    Promise.resolve()
+  );
 
   const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
-  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(
+    () => getSavedCameraPreference().id
+  );
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const [activeResolution, setActiveResolution] = useState<string | null>(null);
 
@@ -278,29 +231,73 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         hasScannedRef.current = false;
 
         let stream: MediaStream | null = null;
+        const savedPref = getSavedCameraPreference();
+        let targetId = preferredCameraId || savedPref.id || undefined;
 
-        // 1. Tenta com preferredCameraId (se informado pelo usuário)
-        if (preferredCameraId) {
+        // 1. Tenta com preferredCameraId ou câmera salva no localStorage
+        if (targetId) {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
               video: {
-                deviceId: { exact: preferredCameraId },
+                deviceId: { exact: targetId },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
               },
               audio: false,
             });
           } catch (prefErr) {
             console.warn(
-              'Falha ao abrir câmera com deviceId específico, usando padrão traseira...',
+              'Falha ao abrir câmera com deviceId específico, buscando alternativa...',
               prefErr
             );
           }
         }
 
-        // 2. Se não abriu, usa a câmera traseira padrão (environment)
+        // 2. Se falhou com deviceId exato mas temos a label salva (ou para evitar a 0.5x),
+        // consulta os dispositivos disponíveis antes de abrir câmera genérica
+        if (!stream && navigator.mediaDevices?.enumerateDevices) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevs = devices
+              .filter((d) => d.kind === 'videoinput')
+              .map((d, index) => ({
+                id: d.deviceId,
+                label: d.label || `Câmera ${index + 1}`,
+              }));
+
+            if (videoDevs.length > 0) {
+              setAvailableCameras(videoDevs);
+              const bestCamera = findBestCamera(videoDevs, targetId, savedPref.label);
+              if (bestCamera && bestCamera.id !== targetId) {
+                targetId = bestCamera.id;
+                try {
+                  stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                      deviceId: { exact: bestCamera.id },
+                      width: { ideal: 1920 },
+                      height: { ideal: 1080 },
+                    },
+                    audio: false,
+                  });
+                } catch {
+                  // Continua para o fallback
+                }
+              }
+            }
+          } catch {
+            // Ignora erro
+          }
+        }
+
+        // 3. Fallback: usa a câmera traseira padrão (environment em Full HD ideal)
         if (!stream) {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: { ideal: 'environment' } },
+              video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+              },
               audio: false,
             });
           } catch {
@@ -365,7 +362,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           }
         }
 
-        // Enumera dispositivos após permissão concedida
+        // 4. Enumera dispositivos após permissão concedida e faz a seleção inteligente
         if (navigator.mediaDevices?.enumerateDevices) {
           try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -375,8 +372,46 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 id: d.deviceId,
                 label: d.label || `Câmera ${index + 1}`,
               }));
+
             if (videoDevs.length > 0) {
               setAvailableCameras(videoDevs);
+
+              const currentTrack = stream.getVideoTracks()[0];
+              const currentDeviceId = currentTrack?.getSettings?.()?.deviceId;
+              const currentDeviceObj = videoDevs.find((d) => d.id === currentDeviceId);
+              const currentLabel = currentDeviceObj?.label || currentTrack?.label || '';
+
+              // Se a câmera que abriu é uma lente 0.5x ultra-wide e o usuário NÃO a escolheu deliberadamente:
+              // Alterna automaticamente para a lente 1x Principal
+              const userSavedPref = getSavedCameraPreference();
+              const userChoseThisUltraWide = userSavedPref.id === currentDeviceId;
+
+              if (isUltraWideCamera(currentLabel) && !userChoseThisUltraWide) {
+                const bestCamera = findBestCamera(
+                  videoDevs,
+                  userSavedPref.id,
+                  userSavedPref.label
+                );
+                if (
+                  bestCamera &&
+                  bestCamera.id !== currentDeviceId &&
+                  !isUltraWideCamera(bestCamera.label)
+                ) {
+                  console.info(
+                    `[Scanner] Câmera padrão era 0.5x (${currentLabel}). Alternando automaticamente para 1x Principal (${bestCamera.label})...`
+                  );
+                  saveCameraPreference(bestCamera.id, bestCamera.label);
+                  setActiveCameraId(bestCamera.id);
+                  // Reinicia com a melhor câmera
+                  await startCameraRef.current(bestCamera.id);
+                  return;
+                }
+              }
+
+              // Salva a preferência da câmera ativa se ainda não estava gravada
+              if (currentDeviceId) {
+                saveCameraPreference(currentDeviceId, currentLabel);
+              }
             }
           } catch {
             // Ignora erro de enumeração
@@ -401,6 +436,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     [stopCamera]
   );
 
+  useEffect(() => {
+    startCameraRef.current = startCamera;
+  }, [startCamera]);
+
   // Inicialização e limpeza ao abrir/fechar o modal
   useEffect(() => {
     if (!isOpen) {
@@ -411,9 +450,37 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     let isMounted = true;
 
     // Timeout mínimo para garantir renderização do elemento <video>
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
+      if (!isMounted) return;
+
+      const saved = getSavedCameraPreference();
+      let initialCameraId = saved.id || undefined;
+
+      // Se enumerateDevices estiver disponível antes de abrir a câmera, tenta descobrir a melhor lente
+      if (navigator.mediaDevices?.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevs = devices
+            .filter((d) => d.kind === 'videoinput')
+            .map((d, index) => ({
+              id: d.deviceId,
+              label: d.label || `Câmera ${index + 1}`,
+            }));
+
+          if (videoDevs.length > 0) {
+            setAvailableCameras(videoDevs);
+            const best = findBestCamera(videoDevs, saved.id, saved.label);
+            if (best) {
+              initialCameraId = best.id;
+            }
+          }
+        } catch {
+          // Ignora
+        }
+      }
+
       if (isMounted) {
-        void startCamera();
+        void startCamera(initialCameraId);
       }
     }, 50);
 
@@ -446,6 +513,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   // Troca de câmera via seleção explícita
   const handleSelectCamera = async (newCameraId: string) => {
     if (!newCameraId || newCameraId === activeCameraId || isSwitchingCamera) return;
+    const selectedObj = availableCameras.find((c) => c.id === newCameraId);
+    saveCameraPreference(newCameraId, selectedObj?.label);
     setActiveCameraId(newCameraId);
     await startCamera(newCameraId);
   };
@@ -454,13 +523,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const handleSwitchCameraCycle = async () => {
     if (availableCameras.length <= 1 || isSwitchingCamera) return;
 
-    const backCameras = availableCameras.filter(
-      (c) =>
-        !c.label.toLowerCase().includes('front') &&
-        !c.label.toLowerCase().includes('user') &&
-        !c.label.toLowerCase().includes('selfie') &&
-        !c.label.toLowerCase().includes('frontal')
-    );
+    const backCameras = availableCameras.filter((c) => !isFrontCamera(c.label));
 
     const list = backCameras.length > 1 ? backCameras : availableCameras;
     const currentIndex = list.findIndex((c) => c.id === activeCameraId);
@@ -468,6 +531,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const nextCamera = list[nextIndex];
 
     if (nextCamera) {
+      saveCameraPreference(nextCamera.id, nextCamera.label);
       await handleSelectCamera(nextCamera.id);
     }
   };
@@ -689,7 +753,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
               disabled={isSwitchingCamera}
               className="flex-1 bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-xl px-2.5 py-1.5 focus:border-primary focus:outline-none truncate"
             >
-              {availableCameras.map((cam, idx) => (
+              {sortCamerasForDisplay(availableCameras).map((cam, idx) => (
                 <option key={cam.id} value={cam.id}>
                   {formatCameraLabel(cam.label, idx)}
                 </option>
