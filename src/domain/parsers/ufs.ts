@@ -32,3 +32,7 @@ export const UF_MAP: Record<string, UfInfo> = {
   '52': { uf: 'GO', name: 'Goiás' },
   '53': { uf: 'DF', name: 'Distrito Federal' },
 };
+
+export function getUfFromCode(code: string): UfInfo | undefined {
+  return UF_MAP[code];
+}
