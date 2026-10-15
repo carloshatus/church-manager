@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wifi,
   WifiOff,
@@ -6,8 +6,11 @@ import {
   ShieldCheck,
   LayoutDashboard,
   PlusCircle,
+  Settings,
 } from 'lucide-react';
 import { useNetworkStore } from '@/stores/use-network-store';
+import { useChurchSettingsStore } from '@/stores/use-church-settings-store';
+import { SettingsDialog } from '@/components/settings/settings-dialog';
 
 interface HeaderProps {
   activeTab?: 'dashboard' | 'new-invoice';
@@ -19,6 +22,12 @@ export const Header: React.FC<HeaderProps> = ({
   onTabChange,
 }) => {
   const isOnline = useNetworkStore((state) => state.isOnline);
+  const loadSettings = useChurchSettingsStore((state) => state.loadSettings);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   return (
     <>
@@ -118,9 +127,22 @@ export const Header: React.FC<HeaderProps> = ({
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
               <span>IndexedDB</span>
             </div>
+
+            {/* Botão de Configurações da Igreja */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-1.5 sm:p-2 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 transition shadow-sm"
+              title="Configurações da Igreja & Destinatários"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Modal de Configurações */}
+      <SettingsDialog isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
       {/* Barra de Navegação Inferior Nativa para Celular (sm:hidden) */}
       {onTabChange && (

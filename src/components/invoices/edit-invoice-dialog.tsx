@@ -5,6 +5,7 @@ import { cnpjService } from '@/adapters/cnpj/cnpj-service';
 import { ImageCompressionService } from '@/services/image-compression.service';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
 import { StatusBadge } from './status-badge';
+import { RecipientStatusBadge } from './recipient-status-badge';
 import { PhotoPreviewDialog } from '@/components/photo/photo-preview-dialog';
 import {
   X,
@@ -20,6 +21,7 @@ import {
   CheckCircle2,
   FileText,
   Upload,
+  UserCheck,
 } from 'lucide-react';
 
 interface EditInvoiceFormProps {
@@ -44,14 +46,16 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
   const [model, setModel] = useState(invoice.model || '');
   const [series, setSeries] = useState(invoice.series || '');
   const [number, setNumber] = useState(invoice.number || '');
+  const [recipientCpfCnpj, setRecipientCpfCnpj] = useState(
+    invoice.recipientCpfCnpj || ''
+  );
+  const [recipientName, setRecipientName] = useState(invoice.recipientName || '');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(
     invoice.syncStatus || 'PENDING_SYNC'
   );
 
   // Gestão de foto com Blob nativo e ObjectURL com prevenção de vazamento
-  const [currentBlob, setCurrentBlob] = useState<Blob | null>(
-    invoice.imageBlob || null
-  );
+  const [currentBlob, setCurrentBlob] = useState<Blob | null>(invoice.imageBlob || null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(() => {
     if (invoice.imageBlob) {
       return URL.createObjectURL(invoice.imageBlob);
@@ -175,6 +179,8 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
         model: model.trim() || undefined,
         series: series.trim() || undefined,
         number: number.trim() || undefined,
+        recipientCpfCnpj: recipientCpfCnpj.replace(/\D/g, '') || undefined,
+        recipientName: recipientName.trim() || undefined,
         syncStatus,
         imageBlob: currentBlob || undefined,
       };
@@ -333,6 +339,50 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-primary focus:outline-none"
               />
             </div>
+          </div>
+
+          {/* Destinatário / Consumidor (Auditoria Fiscal) */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-primary" />
+                Destinatário / Consumidor
+              </h3>
+              <RecipientStatusBadge
+                recipientCpfCnpj={recipientCpfCnpj}
+                showDetails={false}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">CPF ou CNPJ</label>
+                <input
+                  type="text"
+                  value={recipientCpfCnpj}
+                  onChange={(e) => setRecipientCpfCnpj(e.target.value)}
+                  placeholder="Não informado (Consumidor Final)"
+                  maxLength={18}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-mono text-slate-100 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Nome / Razão Social</label>
+                <input
+                  type="text"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="Consumidor ou Nome do Voluntário"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <RecipientStatusBadge
+              recipientCpfCnpj={recipientCpfCnpj}
+              showDetails={true}
+            />
           </div>
 
           {/* Metadados Fiscais e Valor Total */}
@@ -494,7 +544,8 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
                   Adicionar Foto do Comprovante Físico
                 </span>
                 <span className="text-[10px] text-slate-500">
-                  Tire uma foto ou selecione do celular (compressão automática &lt; 800 KB)
+                  Tire uma foto ou selecione do celular (compressão automática &lt; 800
+                  KB)
                 </span>
               </button>
             )}

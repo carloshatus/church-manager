@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Invoice } from '@/domain/entities/invoice';
 import { StatusBadge } from './status-badge';
+import { RecipientStatusBadge } from './recipient-status-badge';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
 import { Calendar, Trash2, Eye, Building2, ChevronRight, Pencil } from 'lucide-react';
 import { PhotoPreviewDialog } from '@/components/photo/photo-preview-dialog';
@@ -41,6 +42,11 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge type="invoiceType" value={invoice.type} />
             <StatusBadge type="sync" value={invoice.syncStatus} />
+            {invoice.items && invoice.items.length > 0 && (
+              <span className="rounded-full bg-slate-800 border border-slate-700 px-2 py-0.5 text-[10px] font-mono text-slate-300">
+                {invoice.items.length} {invoice.items.length === 1 ? 'item' : 'itens'}
+              </span>
+            )}
           </div>
           <h3
             onClick={() => onViewDetails?.(invoice)}
@@ -51,7 +57,15 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
               {invoice.issuerName || 'Razão Social não informada'}
             </span>
           </h3>
-          <p className="text-xs text-slate-400 font-mono">CNPJ: {invoice.issuerCnpj}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <span className="font-mono">CNPJ: {invoice.issuerCnpj}</span>
+          </div>
+          <div className="pt-0.5">
+            <RecipientStatusBadge
+              recipientCpfCnpj={invoice.recipientCpfCnpj}
+              showDetails={false}
+            />
+          </div>
         </div>
 
         {/* Thumbnail da foto anexada */}
