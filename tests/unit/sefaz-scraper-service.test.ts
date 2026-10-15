@@ -73,4 +73,30 @@ describe('Adapters: SefazScraperService (Orquestrador de Scraping com Proxy CORS
     expect(result.issuerName).toBe('SUPERMERCADO TESTE BA');
     expect(result.totalAmount).toBe(150.0);
   });
+
+  it('deve delegar a globalThis.fetch preservando o contexto global e evitando Illegal invocation', async () => {
+    let callCount = 0;
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = function (this: unknown) {
+        callCount++;
+        expect(this).toBe(globalThis);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: async () => sampleBaHtml,
+        } as any);
+      } as any;
+
+      const defaultScraper = new SefazScraperService();
+      const baUrl =
+        'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx?p=29260944053985000199650010000661511323710790|2|1|1|HASH';
+
+      await defaultScraper.scrapeByQrCodeUrl(baUrl);
+      expect(callCount).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
+

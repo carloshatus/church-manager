@@ -22,7 +22,9 @@ export class SefazScraperService implements ISefazScraper {
     // Por padrão, utiliza AllOrigins Raw ou proxy configurado
     this.defaultCorsProxyUrl =
       options.corsProxyUrl ?? 'https://api.allorigins.win/raw?url=';
-    this.fetchFn = options.fetchFn ?? globalThis.fetch;
+    this.fetchFn = options.fetchFn
+      ? options.fetchFn.bind(globalThis)
+      : (...args: Parameters<typeof fetch>) => globalThis.fetch(...args);
     this.defaultTimeoutMs = options.timeoutMs ?? 12000;
   }
 
