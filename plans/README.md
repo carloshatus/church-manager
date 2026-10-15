@@ -22,6 +22,12 @@ Este diretório contém o detalhamento técnico completo para a construção do 
    - Divisão do desenvolvimento do Módulo 1 em 7 etapas incrementais com critérios de aceite (DoD) e guia de pausa/retomada segura.
 9. [08 - Roteiro das Próximas Fases (Roadmap de Evolução)](./08-next-phases-roadmap.md)
    - Planejamento arquitetural das Fases 8 a 11: Motor de Sincronização Remota (Cloud Sync), Web Scraping SEFAZ & OCR, Centros de Custo (PDF/Excel) e Multi-Congregação/RBAC.
+10. [09 - Web Scraping SEFAZ por Estado & Validação de Destinatário](./09-sefaz-scraping-and-recipient-validation.md)
+   - Arquitetura modular de scraping por UF (SEFAZ-BA e registry de estados), descoberta de campos faltantes e auditoria de conformidade de destinatário (CPFs/CNPJs autorizados).
+11. [10 - Gestão de Departamentos & Agrupamento de Notas Fiscais](./10-departments-and-invoice-grouping.md)
+   - Cadastro e gestão de departamentos/centros de custo (code, nome, responsável), vinculação de notas fiscais e visualização agrupada no Dashboard com subtotais.
+12. [11 - Sincronização P2P em Rede Local com Pareamento por QR Code (Zero Backend)](./11-local-p2p-sync-with-qr-pairing.md)
+   - Conexão direta browser-to-browser via WebRTC DataChannel na rede local, pareamento instantâneo via QR Code na tela e transferência de notas e fotos sem custo de nuvem.
 
 ---
 *Gerado a partir das especificações de `prompts/plan.md`.*
