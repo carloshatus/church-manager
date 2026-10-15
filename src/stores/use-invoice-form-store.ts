@@ -1,10 +1,13 @@
 import { create } from 'zustand';
-import type { InvoiceType } from '@/domain/entities/invoice';
+import type { InvoiceType, SefazDataStatus } from '@/domain/entities/invoice';
+import type { InvoiceItem } from '@/domain/entities/invoice-item';
 import { parseScannedInput } from '@/domain/parsers/nfce-url-parser';
 import { parseNFeKey } from '@/domain/parsers/nfe-key-parser';
 import { cnpjService } from '@/adapters/cnpj/cnpj-service';
+import { sefazScraperService } from '@/adapters/sefaz/sefaz-scraper.service';
 import { ImageCompressionService } from '@/services/image-compression.service';
 import { invoiceRepository } from '@/adapters/storage/dexie-invoice.repository';
+import { useChurchSettingsStore } from './use-church-settings-store';
 
 export interface FormFields {
   accessKey: string;
@@ -13,21 +16,31 @@ export interface FormFields {
   emissionDate: string;
   issuerCnpj: string;
   issuerName: string;
+  issuerAddress: string;
   model: string;
   series: string;
   number: string;
   totalAmount: string;
+  taxAmount: string;
+  paymentMethod: string;
+  protocol: string;
+  recipientCpfCnpj: string;
+  recipientName: string;
 }
 
 interface InvoiceFormState {
   fields: FormFields;
+  items: InvoiceItem[];
   imageBlob: Blob | null;
   imagePreviewUrl: string | null;
 
   isScanningModalOpen: boolean;
   isCompressingPhoto: boolean;
   isResolvingCnpj: boolean;
+  isScrapingSefaz: boolean;
+  sefazScraped: boolean;
   cnpjError: string | null;
+  sefazError: string | null;
   cnpjProviderUsed: string | null;
   formError: string | null;
   isSubmitting: boolean;
@@ -35,8 +48,11 @@ interface InvoiceFormState {
 
   setScanningModalOpen: (open: boolean) => void;
   setFormField: (field: keyof FormFields, value: string) => void;
+  setItems: (items: InvoiceItem[]) => void;
   handleScannedData: (rawInput: string) => Promise<void>;
   retryResolveCnpj: (overrideCnpj?: string, forceRefresh?: boolean) => Promise<void>;
+  scrapeSefaz: (overrideUrl?: string) => Promise<void>;
+  parseRawSefazHtml: (html: string) => void;
   handlePhotoSelected: (file: File) => Promise<void>;
   removePhoto: () => void;
   resetForm: () => void;
@@ -50,20 +66,30 @@ const initialFields: FormFields = {
   emissionDate: '',
   issuerCnpj: '',
   issuerName: '',
+  issuerAddress: '',
   model: '',
   series: '',
   number: '',
   totalAmount: '',
+  taxAmount: '',
+  paymentMethod: '',
+  protocol: '',
+  recipientCpfCnpj: '',
+  recipientName: '',
 };
 
 export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
   fields: initialFields,
+  items: [],
   imageBlob: null,
   imagePreviewUrl: null,
   isScanningModalOpen: false,
   isCompressingPhoto: false,
   isResolvingCnpj: false,
+  isScrapingSefaz: false,
+  sefazScraped: false,
   cnpjError: null,
+  sefazError: null,
   cnpjProviderUsed: null,
   formError: null,
   isSubmitting: false,
@@ -75,6 +101,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
 
   setFormField: (field, value) => {
     let cnpjToFetch: string | null = null;
+    let urlToScrape: string | null = null;
 
     set((state) => {
       const updatedFields = { ...state.fields, [field]: value };
@@ -96,6 +123,10 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
             updatedFields.model = parsed.model;
             updatedFields.series = parsed.series;
             updatedFields.number = parsed.number;
+
+            if (scanned.qrCodeUrl) {
+              urlToScrape = scanned.qrCodeUrl;
+            }
 
             if (parsed.cnpj && parsed.cnpj.length === 14) {
               cnpjToFetch = parsed.cnpj;
@@ -143,10 +174,18 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
     if (cnpjToFetch) {
       void get().retryResolveCnpj(cnpjToFetch);
     }
+
+    if (urlToScrape) {
+      void get().scrapeSefaz(urlToScrape);
+    }
+  },
+
+  setItems: (items) => {
+    set({ items });
   },
 
   handleScannedData: async (rawInput: string) => {
-    set({ formError: null, cnpjError: null });
+    set({ formError: null, cnpjError: null, sefazError: null });
     try {
       // 1. Extrai a chave de 44 dígitos (de URL ou texto bruto)
       const scanned = parseScannedInput(rawInput);
@@ -170,11 +209,133 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       }));
 
       // 3. Dispara a consulta assíncrona ao CNPJ
-      await get().retryResolveCnpj(parsedKey.cnpj);
+      void get().retryResolveCnpj(parsedKey.cnpj);
+
+      // 4. Se for URL de QR Code, dispara automaticamente o scraping da SEFAZ
+      if (scanned.qrCodeUrl) {
+        void get().scrapeSefaz(scanned.qrCodeUrl);
+      }
     } catch (err: unknown) {
       set({
         formError: (err as Error)?.message || 'Erro ao processar dados',
         isScanningModalOpen: false,
+      });
+    }
+  },
+
+  scrapeSefaz: async (overrideUrl?: string) => {
+    const targetUrl = overrideUrl || get().fields.qrCodeUrl;
+    if (!targetUrl) return;
+
+    set({ isScrapingSefaz: true, sefazError: null });
+    try {
+      const corsProxyUrl = useChurchSettingsStore.getState().settings.corsProxyUrl;
+      const result = await sefazScraperService.scrapeByQrCodeUrl(targetUrl, corsProxyUrl);
+
+      set((state) => {
+        const nextFields = { ...state.fields };
+
+        if (result.issuerName && !nextFields.issuerName) {
+          nextFields.issuerName = result.issuerName;
+        }
+        if (result.issuerCnpj && !nextFields.issuerCnpj) {
+          nextFields.issuerCnpj = result.issuerCnpj;
+        }
+        if (result.issuerAddress) {
+          nextFields.issuerAddress = result.issuerAddress;
+        }
+        if (result.totalAmount !== undefined) {
+          nextFields.totalAmount = result.totalAmount.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+        if (result.emissionDate) {
+          nextFields.emissionDate = result.emissionDate;
+        }
+        if (result.protocol) {
+          nextFields.protocol = result.protocol;
+        }
+        if (result.recipientCpfCnpj) {
+          nextFields.recipientCpfCnpj = result.recipientCpfCnpj;
+        }
+        if (result.recipientName) {
+          nextFields.recipientName = result.recipientName;
+        }
+        if (result.paymentMethod) {
+          nextFields.paymentMethod = result.paymentMethod;
+        }
+        if (result.taxAmount !== undefined) {
+          nextFields.taxAmount = result.taxAmount.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+
+        return {
+          fields: nextFields,
+          items: result.items && result.items.length > 0 ? result.items : state.items,
+          sefazScraped: true,
+          sefazError: null,
+        };
+      });
+    } catch (err: unknown) {
+      set({
+        sefazError:
+          (err as Error)?.message || 'Não foi possível obter dados automáticos da SEFAZ.',
+      });
+    } finally {
+      set({ isScrapingSefaz: false });
+    }
+  },
+
+  parseRawSefazHtml: (html: string) => {
+    set({ sefazError: null });
+    try {
+      const state = get();
+      const result = sefazScraperService.parseRawHtml(
+        html,
+        undefined,
+        state.fields.qrCodeUrl,
+        state.fields.accessKey
+      );
+
+      set((curr) => {
+        const nextFields = { ...curr.fields };
+
+        if (result.issuerName) nextFields.issuerName = result.issuerName;
+        if (result.issuerCnpj) nextFields.issuerCnpj = result.issuerCnpj;
+        if (result.issuerAddress) nextFields.issuerAddress = result.issuerAddress;
+        if (result.totalAmount !== undefined) {
+          nextFields.totalAmount = result.totalAmount.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+        if (result.emissionDate) nextFields.emissionDate = result.emissionDate;
+        if (result.protocol) nextFields.protocol = result.protocol;
+        if (result.recipientCpfCnpj)
+          nextFields.recipientCpfCnpj = result.recipientCpfCnpj;
+        if (result.recipientName) nextFields.recipientName = result.recipientName;
+        if (result.paymentMethod) nextFields.paymentMethod = result.paymentMethod;
+        if (result.taxAmount !== undefined) {
+          nextFields.taxAmount = result.taxAmount.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+
+        return {
+          fields: nextFields,
+          items: result.items && result.items.length > 0 ? result.items : curr.items,
+          sefazScraped: true,
+          sefazError: null,
+        };
+      });
+    } catch (err: unknown) {
+      set({
+        sefazError:
+          (err as Error)?.message || 'Erro ao interpretar código HTML da SEFAZ.',
       });
     }
   },
@@ -242,9 +403,13 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
     }
     set({
       fields: initialFields,
+      items: [],
       imageBlob: null,
       imagePreviewUrl: null,
+      isScrapingSefaz: false,
+      sefazScraped: false,
       cnpjError: null,
+      sefazError: null,
       cnpjProviderUsed: null,
       formError: null,
       isSubmitting: false,
@@ -253,7 +418,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
   },
 
   submitInvoice: async () => {
-    const { fields, imageBlob } = get();
+    const { fields, items, imageBlob, sefazScraped } = get();
     set({ isSubmitting: true, formError: null });
 
     try {
@@ -269,12 +434,24 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
 
       let parsedAmount: number | undefined = undefined;
       if (fields.totalAmount) {
-        const normalized = fields.totalAmount.replace(',', '.');
+        const normalized = fields.totalAmount.replace(/\./g, '').replace(',', '.');
         const num = parseFloat(normalized);
         if (!isNaN(num)) {
           parsedAmount = num;
         }
       }
+
+      let parsedTaxAmount: number | undefined = undefined;
+      if (fields.taxAmount) {
+        const normalized = fields.taxAmount.replace(/\./g, '').replace(',', '.');
+        const num = parseFloat(normalized);
+        if (!isNaN(num)) {
+          parsedTaxAmount = num;
+        }
+      }
+
+      const sefazStatus: SefazDataStatus =
+        sefazScraped || items.length > 0 ? 'SUCCESS' : 'PENDING';
 
       const id = await invoiceRepository.create({
         accessKey: cleanKey,
@@ -283,12 +460,21 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
         emissionDate: fields.emissionDate || undefined,
         issuerCnpj: cleanCnpj,
         issuerName: fields.issuerName || undefined,
+        issuerAddress: fields.issuerAddress || undefined,
         model: fields.model || undefined,
         series: fields.series || undefined,
         number: fields.number || undefined,
         totalAmount: parsedAmount,
+        taxAmount: parsedTaxAmount,
+        paymentMethod: fields.paymentMethod || undefined,
+        protocol: fields.protocol || undefined,
+        recipientCpfCnpj: fields.recipientCpfCnpj
+          ? fields.recipientCpfCnpj.replace(/\D/g, '')
+          : undefined,
+        recipientName: fields.recipientName || undefined,
+        items: items.length > 0 ? items : undefined,
         imageBlob: imageBlob || undefined,
-        sefazDataStatus: 'PENDING',
+        sefazDataStatus: sefazStatus,
         syncStatus: 'PENDING_SYNC',
       });
 

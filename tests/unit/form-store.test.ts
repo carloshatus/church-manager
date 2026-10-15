@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { useInvoiceFormStore } from '@/stores/use-invoice-form-store';
 import { cnpjService } from '@/adapters/cnpj/cnpj-service';
+import { sefazScraperService } from '@/adapters/sefaz/sefaz-scraper.service';
 import { invoiceRepository } from '@/adapters/storage/dexie-invoice.repository';
 import { calculateNFeKeyDv } from '@/domain/validators/key-checksum';
 
@@ -161,5 +162,79 @@ describe('Form Store: useInvoiceFormStore', () => {
         'Beto Bolsas Vitoria da Conquista Ltda'
       );
     });
+  });
+
+  it('deve disparar scrapeSefaz e preencher itens, valor, protocolo e destinatário', async () => {
+    const store = useInvoiceFormStore.getState();
+    const qrCodeUrl =
+      'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx?p=29260944053985000199650010000661511323710790|2|1|1|HASH';
+
+    vi.spyOn(sefazScraperService, 'scrapeByQrCodeUrl').mockResolvedValue({
+      accessKey: '29260944053985000199650010000661511323710790',
+      issuerName: 'POSTO IPIRANGA BAHIA',
+      issuerCnpj: '44053985000199',
+      totalAmount: 300.0,
+      protocol: '9988776655',
+      recipientCpfCnpj: '17261509000186',
+      items: [
+        {
+          code: '1',
+          description: 'GASOLINA COMUM',
+          quantity: 50,
+          unit: 'L',
+          unitPrice: 6,
+          totalPrice: 300,
+        },
+      ],
+    });
+
+    store.setFormField('qrCodeUrl', qrCodeUrl);
+    await store.scrapeSefaz();
+
+    const state = useInvoiceFormStore.getState();
+    expect(state.fields.totalAmount).toBe('300,00');
+    expect(state.fields.protocol).toBe('9988776655');
+    expect(state.fields.recipientCpfCnpj).toBe('17261509000186');
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0].description).toBe('GASOLINA COMUM');
+    expect(state.items[0].totalPrice).toBe(300);
+    expect(state.sefazScraped).toBe(true);
+    expect(state.sefazError).toBeNull();
+  });
+
+  it('deve processar HTML colado manualmente através de parseRawSefazHtml', () => {
+    const store = useInvoiceFormStore.getState();
+    store.setFormField('accessKey', '29260944053985000199650010000661511323710790');
+
+    const rawHtml = `
+      <div class="txtCenter">
+        <div class="txtTopo">PADARIA CENTRAL</div>
+        <div class="text">CNPJ: 12.345.678/0001-99</div>
+      </div>
+      <table id="tabResult">
+        <tr id="Item + 1">
+          <td>
+            <span class="txtTit">PAO FRANCES</span>
+            <span class="RCod">(Código: 10)</span>
+            <span class="Rqtd"><strong>Qtde.:</strong>1,00</span>
+            <span class="RUN"><strong>UN: </strong>KG</span>
+            <span class="RvlUnit"><strong>Vl. Unit.:</strong> 15,00</span>
+          </td>
+          <td><span class="valor">15,00</span></td>
+        </tr>
+      </table>
+      <div id="totalNota"><span class="totalNumb txtMax">15,00</span></div>
+      <h4>Consumidor</h4>
+      <ul><li>Consumidor não identificado</li></ul>
+    `;
+
+    store.parseRawSefazHtml(rawHtml);
+
+    const state = useInvoiceFormStore.getState();
+    expect(state.fields.issuerName).toBe('PADARIA CENTRAL');
+    expect(state.fields.totalAmount).toBe('15,00');
+    expect(state.fields.recipientName).toBe('Consumidor não identificado');
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0].description).toBe('PAO FRANCES');
   });
 });
