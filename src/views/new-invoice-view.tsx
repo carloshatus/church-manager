@@ -64,7 +64,7 @@ export const NewInvoiceView: React.FC<NewInvoiceViewProps> = ({
       {/* Formulário Principal */}
       <InvoiceForm onSuccess={onInvoiceSaved} />
 
-      {/* Modal de Scanner com html5-qrcode */}
+      {/* Modal de Scanner de QR Code e Código de Barras */}
       <QrScannerModal
         isOpen={isScanningModalOpen}
         onClose={() => setScanningModalOpen(false)}

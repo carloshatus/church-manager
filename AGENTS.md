@@ -10,7 +10,7 @@ O **Church Manager** é uma aplicação web **PWA (Progressive Web App) Single P
 
 ### Principais Casos de Uso:
 1. **Captura Rápida de Comprovantes**: Fotografia de recibos físicos e cupons de compras operacionais com compressão automática (< 800 KB).
-2. **Scanner de Notas Fiscais**: Leitura em tempo real pela câmera traseira (`environment`) de QR Code de **NFC-e** (modelo 65) e código de barras / chave de 44 dígitos de **NF-e** (modelo 55) via `html5-qrcode`.
+2. **Scanner de Notas Fiscais**: Leitura em tempo real pela câmera traseira (`environment`) de QR Code de **NFC-e** (modelo 65) e código de barras / chave de 44 dígitos de **NF-e** (modelo 55) via WebRTC nativo com `jsQR` e `BarcodeDetector`.
 3. **Decomposição e Validação Fiscal**: Parser da chave de 44 dígitos (UF, AAMM, CNPJ, modelo, série, número) com validação matemática de dígito verificador via **Módulo 11**.
 4. **Enriquecimento de CNPJ Resiliente**: Busca automática de Razão Social via provedores externos (BrasilAPI e Minha Receita com orquestração de contingência) e suporte a preenchimento/edição manual transparente.
 5. **Persistência Local e Sincronização**: Armazenamento em banco local do navegador (**IndexedDB** via **Dexie.js**) com controle de status de sincronização (`PENDING_SYNC` vs `SYNCED`).
@@ -44,7 +44,7 @@ src/
 │   ├── invoices/      # Formulário de cadastro, campos de chave e dados fiscais
 │   ├── layout/        # Header, navegação, indicador de rede
 │   ├── photo/         # Input de câmera, preview e compressão de fotos
-│   └── scanner/       # Modal de scanner QR/código de barras (html5-qrcode)
+│   └── scanner/       # Modal de scanner QR/código de barras (WebRTC + jsQR)
 ├── views/             # PÁGINAS PRINCIPAIS (DashboardView, NewInvoiceView)
 └── lib/               # UTILITÁRIOS GERAIS (cn para Tailwind, formatters)
 ```
@@ -69,7 +69,7 @@ Ao propor ou modificar código, os agentes **DEVEM** respeitar as seguintes dire
    - **NUNCA** converta ou armazene imagens como strings Base64 no banco de dados (evita esgotamento de memória RAM e sobrecarga de serialização).
 
 4. **Gerenciamento de Recursos & Prevenção de Leaks de Memória**:
-   - Câmera e Scanner: Sempre desativar e parar tracks de vídeo e instâncias de `Html5Qrcode` no desmontar do componente (`return () => { scanner.stop(); }`).
+   - Câmera e Scanner: Sempre desativar e parar tracks de vídeo e loops de animação no desmontar do componente (`stream.getTracks().forEach(t => t.stop())`).
    - Object URLs: Sempre liberar URLs de preview criadas com `URL.createObjectURL(blob)` chamando `URL.revokeObjectURL(url)` ao desmontar ou substituir imagens.
 
 5. **Design System & Estilização (Tailwind CSS)**:
@@ -89,7 +89,7 @@ Ao propor ou modificar código, os agentes **DEVEM** respeitar as seguintes dire
 | **Dexie.js** | 4.4.x | Abstração elegante sobre IndexedDB com `dexie-react-hooks` |
 | **Zustand** | 5.0.x | Gerenciamento de estado leve e desacoplado |
 | **Radix UI** | 1.x / 2.x | Primitivos acessíveis de UI (Dialog, Label, Slot) |
-| **html5-qrcode** | 2.3.x | Decodificação de QR Code e Barcode via WebRTC |
+| **jsQR & BarcodeDetector** | 1.4.x / Nativo | Decodificação de alta velocidade de QR Code e Barcode via WebRTC nativo |
 | **Vitest** | 5.x | Suíte de testes unitários ultrarrápida |
 
 ### Comandos de Desenvolvimento:

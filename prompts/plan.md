@@ -6,7 +6,7 @@ Act as a Senior Frontend Architect. Create a detailed technical plan and executi
 - **PWA & Offline:** `vite-plugin-pwa` for Service Worker and manifest.
 - **Local Database:** Dexie.js (IndexedDB).
 - **State Management:** Zustand.
-- **Scanner Library:** `html5-qrcode`.
+- **Scanner Library:** WebRTC nativo + `jsQR` & `BarcodeDetector`.
 - **Image Compression:** `browser-image-compression`.
 - **Architecture Pattern:** Adapter Pattern (Ports and Adapters) for external communications to ensure maintainability and decoupling.
 

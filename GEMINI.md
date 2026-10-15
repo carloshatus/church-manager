@@ -27,13 +27,14 @@ O projeto utiliza **Arquitetura Hexagonal (Ports & Adapters)** com separação e
 - **Degradação Graciosa**: A aplicação nunca pode quebrar por falta de internet. Se uma consulta externa (ex: CNPJ na Receita) falhar ou estiver sem rede, permita a inserção e edição manual imediatamente.
 
 ### 2. Ciclo de Vida e Prevenção de Vazamento de Memória
-- **Câmera e Scanner**: Ao utilizar `html5-qrcode` ou streams de mídia da câmera, garanta que a instância seja interrompida e liberada na função de limpeza do `useEffect`:
+- **Câmera e Scanner**: Ao utilizar streams de mídia WebRTC (`getUserMedia`), garanta que os tracks e loops de animação sejam interrompidos e liberados na função de limpeza do `useEffect`:
   ```tsx
   useEffect(() => {
     // Inicialização
     return () => {
-      // Parada obrigatória de scanner e liberação de tracks de vídeo
-      scanner.stop().catch(console.error);
+      // Parada obrigatória de animação e liberação de tracks de vídeo
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      stream?.getTracks().forEach((track) => track.stop());
     };
   }, []);
   ```

@@ -38,7 +38,7 @@ Muitas vezes, as compras ocorrem em locais com baixa conectividade à internet. 
 ## ✨ Principais Funcionalidades
 
 1. 📷 **Scanner com Câmera em Tempo Real**:
-   - Integração com `html5-qrcode` com suporte a câmera traseira (`environment`).
+   - Integração com WebRTC nativo (`getUserMedia`), `jsQR` e `BarcodeDetector` com suporte a câmera traseira (`environment`).
    - Leitura de **QR Codes de NFC-e** e códigos de barras de **NF-e (Code 128 / 44 dígitos)** com mira e animação de laser.
 2. ⚡ **Parser Especializado de Chaves & URLs Fiscais**:
    - Decomposição da chave de 44 dígitos: UF de emissão, ano/mês, CNPJ do emitente, modelo (55 ou 65), série, número e validação matemática de dígito verificador via **Módulo 11**.
@@ -68,7 +68,7 @@ graph TD
     subgraph UI ["Camada de Apresentação (UI / React)"]
         Dashboard["Dashboard View"]
         RegForm["Invoice Registration Form"]
-        Scanner["QR/Barcode Scanner (html5-qrcode)"]
+        Scanner["QR/Barcode Scanner (WebRTC + jsQR)"]
         PhotoCapture["Camera Capture & Preview"]
     end
 
@@ -119,7 +119,7 @@ graph TD
 | **PWA & Offline** | **`vite-plugin-pwa` (Workbox)** | Instalação no celular (Android/iOS), Service Worker com pré-cache e estratégia `NetworkFirst` para APIs. |
 | **Banco Local** | **Dexie.js (IndexedDB)** | Armazenamento no cliente com suporte nativo a `Blob` binário, consultas indexadas rápidas e reatividade. |
 | **Estado Global** | **Zustand** | Store leve, sem boilerplate, com excelente desempenho para dados de scanner, formulário e rede. |
-| **Leitura de Códigos**| **`html5-qrcode`** | Suporte direto a QR Code e Code 128 em navegadores móveis com gerenciamento estrito de ciclo de vida da câmera. |
+| **Leitura de Códigos**| **WebRTC + `jsQR` & `BarcodeDetector`** | Leitura instantânea de QR Code e Barcode em navegadores móveis sem overhead, com gerenciamento seguro da câmera. |
 | **Compressão** | **`browser-image-compression`** | Execução em Web Worker que comprime imagens de câmeras de celular (5MB–12MB) para < 800 KB sem travar a interface. |
 | **Design System** | **Tailwind CSS + shadcn/ui primitives** | Tema escuro refinado (HSL), tipografia fluida, feedback visual de conectividade e animações de laser. |
 
@@ -146,7 +146,7 @@ church-manager/
 │   │   └── storage/                    # Dexie ChurchManagerDB & DexieInvoiceRepository
 │   ├── components/                     # Componentes React reutilizáveis
 │   │   ├── layout/                     # Header (Online/Offline, badges)
-│   │   ├── scanner/                    # Modal de scanner com câmera (html5-qrcode)
+│   │   ├── scanner/                    # Modal de scanner com câmera (WebRTC + jsQR)
 │   │   ├── photo/                      # Uploader de comprovante e compressão
 │   │   └── invoices/                   # Formulário, cards e badges de status
 │   ├── domain/                         # Regras de negócio puras (sem dependências de UI)
@@ -178,7 +178,7 @@ O desenvolvimento está estruturado em 7 etapas incrementais. Cada etapa possui 
 | **2** | **Domínio Fiscal & Parsers (com Vitest)** | ✅ **Concluída** | Módulo 11, decomposição da chave de 44 dígitos, extração de URLs da SEFAZ e 13 testes unitários. |
 | **3** | **IndexedDB (Dexie.js) & Fotos (Blob)** | ✅ **Concluída** | Banco `ChurchManagerDB`, repositório CRUD, compressão Web Worker e 7 testes com `fake-indexeddb`. |
 | **4** | **Ports & Adapters (Resiliência de CNPJ)** | ✅ **Concluída** | BrasilAPI + Minha Receita com fallback automático, cache em memória e 8 testes unitários. |
-| **5** | **Captura Física (Scanner & Câmera)** | ✅ **Concluída** | Modal com `html5-qrcode`, ciclo de vida seguro, mira laser e captura de fotos com compressão. |
+| **5** | **Captura Física (Scanner & Câmera)** | ✅ **Concluída** | Modal com WebRTC nativo (`jsQR` + `BarcodeDetector`), ciclo de vida seguro, mira laser e captura de fotos com compressão. |
 | **6** | **Formulário de Registro Completo** | ✅ **Concluída** | Preenchimento automático pós-scan, override manual livre em todos os campos, retry e persistência no Dexie. |
 | **7** | **Dashboard, Métricas & Auditoria PWA** | ✅ **Concluída** | Métricas financeiras em R$, busca em tempo real, visualizador completo de notas com link SEFAZ e PWA auditado. |
 

@@ -9,7 +9,7 @@ Este arquivo contém as diretrizes e instruções de contexto para o **Claude** 
 O **Church Manager** é uma aplicação PWA Single Page Application (SPA) **100% Offline-First** desenvolvida para simplificar a gestão e prestação de contas de notas fiscais (**NF-e**, modelo 55) e cupons fiscais (**NFC-e**, modelo 65) em igrejas e congregações.
 
 ### Principais Capacidades:
-- Leitura de QR Code de NFC-e e Código de Barras de NF-e via câmera traseira (`html5-qrcode`).
+- Leitura de QR Code de NFC-e e Código de Barras de NF-e via câmera traseira nativa (WebRTC + `jsQR` e `BarcodeDetector`).
 - Decomposição de chave de 44 dígitos e validação via algoritmo **Módulo 11**.
 - Consulta resiliente de CNPJ com fallback sequencial (**Minha Receita** e **BrasilAPI**) e suporte a preenchimento manual imediato caso offline.
 - Captura e compressão client-side de fotos de comprovantes (< 800 KB) armazenadas nativamente como `Blob` binário.
