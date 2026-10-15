@@ -203,6 +203,43 @@ describe('Storage & Dexie: Repositório de Notas Fiscais', () => {
 
     expect(await repository.findById(id)).toBeUndefined();
   });
+
+  it('deve cadastrar e recuperar nota com itens detalhados, destinatário e protocolo da SEFAZ', async () => {
+    const accessKey = '29260944053985000199650010000661511323710790';
+    const id = await repository.create({
+      accessKey,
+      type: 'NFCE',
+      issuerCnpj: '44053985000199',
+      issuerName: 'NOLASCO & SOUSA LTDA',
+      totalAmount: 400.0,
+      protocol: '229261255104844',
+      recipientCpfCnpj: '17261509000786',
+      recipientName: 'Consumidor',
+      paymentMethod: '1 - Dinheiro',
+      taxAmount: 108.0,
+      items: [
+        {
+          code: '6',
+          description: 'OLEO DIESEL B S500 COMUM',
+          quantity: 49.444,
+          unit: 'LITRO',
+          unitPrice: 8.09,
+          totalPrice: 400.0,
+        },
+      ],
+      sefazDataStatus: 'SUCCESS',
+      syncStatus: 'PENDING_SYNC',
+    });
+
+    const retrieved = await repository.findById(id);
+    expect(retrieved).toBeDefined();
+    expect(retrieved?.protocol).toBe('229261255104844');
+    expect(retrieved?.recipientCpfCnpj).toBe('17261509000786');
+    expect(retrieved?.recipientName).toBe('Consumidor');
+    expect(retrieved?.items).toHaveLength(1);
+    expect(retrieved?.items?.[0].description).toBe('OLEO DIESEL B S500 COMUM');
+    expect(retrieved?.items?.[0].quantity).toBe(49.444);
+  });
 });
 
 describe('ImageCompressionService & ObjectURL Lifecycle', () => {
