@@ -164,11 +164,12 @@ describe('Form Store: useInvoiceFormStore', () => {
     });
   });
 
-  it('deve disparar scrapeSefaz e preencher itens, valor, protocolo e destinatário', async () => {
+  it('deve disparar scrapeSefaz e preencher itens, valor, protocolo e destinatário quando habilitado', async () => {
     const store = useInvoiceFormStore.getState();
     const qrCodeUrl =
       'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx?p=29260944053985000199650010000661511323710790|2|1|1|HASH';
 
+    vi.spyOn(sefazScraperService, 'isSearchEnabled').mockReturnValue(true);
     vi.spyOn(sefazScraperService, 'scrapeByQrCodeUrl').mockResolvedValue({
       accessKey: '29260944053985000199650010000661511323710790',
       issuerName: 'POSTO IPIRANGA BAHIA',
@@ -200,6 +201,34 @@ describe('Form Store: useInvoiceFormStore', () => {
     expect(state.items[0].totalPrice).toBe(300);
     expect(state.sefazScraped).toBe(true);
     expect(state.sefazError).toBeNull();
+  });
+
+  it('não deve disparar scrapeSefaz automaticamente ao escanear QR Code', async () => {
+    const spyScrape = vi.spyOn(sefazScraperService, 'scrapeByQrCodeUrl');
+    vi.spyOn(cnpjService, 'resolveCnpj').mockResolvedValue({
+      cnpj: '12345678000199',
+      razaoSocial: 'Comércio Teste',
+      provider: 'BrasilAPI',
+    });
+
+    const store = useInvoiceFormStore.getState();
+    const qrCodeUrl = `https://www.fazenda.sp.gov.br/qrcode?p=${sampleKey}|2|1|1|HASH`;
+
+    await store.handleScannedData(qrCodeUrl);
+
+    expect(spyScrape).not.toHaveBeenCalled();
+    expect(useInvoiceFormStore.getState().isScrapingSefaz).toBe(false);
+  });
+
+  it('deve definir mensagem explicativa em sefazError ao chamar scrapeSefaz com busca desativada', async () => {
+    const store = useInvoiceFormStore.getState();
+    store.setFormField('qrCodeUrl', 'https://www.fazenda.sp.gov.br/qrcode?p=...');
+
+    await store.scrapeSefaz();
+
+    const state = useInvoiceFormStore.getState();
+    expect(state.isScrapingSefaz).toBe(false);
+    expect(state.sefazError).toContain('temporariamente desativada');
   });
 
   it('deve processar HTML colado manualmente através de parseRawSefazHtml', () => {

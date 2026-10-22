@@ -101,7 +101,6 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
 
   setFormField: (field, value) => {
     let cnpjToFetch: string | null = null;
-    let urlToScrape: string | null = null;
 
     set((state) => {
       const updatedFields = { ...state.fields, [field]: value };
@@ -123,10 +122,6 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
             updatedFields.model = parsed.model;
             updatedFields.series = parsed.series;
             updatedFields.number = parsed.number;
-
-            if (scanned.qrCodeUrl) {
-              urlToScrape = scanned.qrCodeUrl;
-            }
 
             if (parsed.cnpj && parsed.cnpj.length === 14) {
               cnpjToFetch = parsed.cnpj;
@@ -174,10 +169,6 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
     if (cnpjToFetch) {
       void get().retryResolveCnpj(cnpjToFetch);
     }
-
-    if (urlToScrape) {
-      void get().scrapeSefaz(urlToScrape);
-    }
   },
 
   setItems: (items) => {
@@ -211,10 +202,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
       // 3. Dispara a consulta assíncrona ao CNPJ
       void get().retryResolveCnpj(parsedKey.cnpj);
 
-      // 4. Se for URL de QR Code, dispara automaticamente o scraping da SEFAZ
-      if (scanned.qrCodeUrl) {
-        void get().scrapeSefaz(scanned.qrCodeUrl);
-      }
+      // 4. Scraping remoto da SEFAZ via proxy desativado temporariamente
     } catch (err: unknown) {
       set({
         formError: (err as Error)?.message || 'Erro ao processar dados',
@@ -224,6 +212,16 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
   },
 
   scrapeSefaz: async (overrideUrl?: string) => {
+    // Busca online na SEFAZ desativada temporariamente (proxies instáveis)
+    if (!sefazScraperService.isSearchEnabled()) {
+      set({
+        isScrapingSefaz: false,
+        sefazError:
+          'A consulta online na SEFAZ via proxy está temporariamente desativada. Cole o HTML do portal ou informe os dados manualmente.',
+      });
+      return;
+    }
+
     const targetUrl = overrideUrl || get().fields.qrCodeUrl;
     if (!targetUrl) return;
 
