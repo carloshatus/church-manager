@@ -23,6 +23,7 @@ import { StatusBadge } from './status-badge';
 import { RecipientStatusBadge } from './recipient-status-badge';
 import { InvoiceItemsTable } from './invoice-items-table';
 import { formatAccessKey } from '@/domain/parsers/nfe-key-parser';
+import { sefazScraperService } from '@/adapters/sefaz/sefaz-scraper.service';
 
 interface InvoiceFormProps {
   onSuccess?: (id: number) => void;
@@ -77,9 +78,10 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
     setPastedHtml('');
   };
 
+  const isSefazSearchEnabled = sefazScraperService.isSearchEnabled();
   const cleanKey = fields.accessKey.replace(/\D/g, '');
   const isKeyComplete = cleanKey.length === 44;
-  const canScrape = Boolean(fields.qrCodeUrl || isKeyComplete);
+  const canScrape = isSefazSearchEnabled && Boolean(fields.qrCodeUrl || isKeyComplete);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -194,17 +196,19 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ onSuccess }) => {
               <span>{sefazError}</span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => scrapeSefaz()}
-                disabled={isScrapingSefaz}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition"
-              >
-                <RotateCw
-                  className={`w-3.5 h-3.5 ${isScrapingSefaz ? 'animate-spin' : ''}`}
-                />
-                Tentar Novamente
-              </button>
+              {isSefazSearchEnabled && (
+                <button
+                  type="button"
+                  onClick={() => scrapeSefaz()}
+                  disabled={isScrapingSefaz}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/30 transition"
+                >
+                  <RotateCw
+                    className={`w-3.5 h-3.5 ${isScrapingSefaz ? 'animate-spin' : ''}`}
+                  />
+                  Tentar Novamente
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsHtmlModalOpen(true)}

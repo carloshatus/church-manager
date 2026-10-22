@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useChurchSettingsStore } from '@/stores/use-church-settings-store';
 import type { RecipientRole } from '@/domain/entities/church-settings';
@@ -168,6 +169,9 @@ const SettingsDialogContent: React.FC<SettingsDialogContentProps> = ({
           >
             <Globe className="w-4 h-4" />
             <span>Proxy & Scraping SEFAZ</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Desativado
+            </span>
           </button>
         </div>
 
@@ -351,15 +355,28 @@ const SettingsDialogContent: React.FC<SettingsDialogContentProps> = ({
           {/* ABA 3: PROXY & SCRAPING SEFAZ */}
           {activeTab === 'scraping' && (
             <form onSubmit={handleSaveGeneral} className="space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-400 space-y-2">
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 space-y-2">
+                <p className="font-semibold text-amber-200 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  Busca na SEFAZ Temporariamente Desativada
+                </p>
+                <p>
+                  A consulta automática e scraping via proxies CORS foram desativados temporariamente devido à instabilidade dos proxies frente às restrições dos portais da SEFAZ.
+                </p>
+                <p className="text-slate-400">
+                  No futuro, novas alternativas de integração serão disponibilizadas. Para importar produtos e totais sem digitação, utilize a opção <strong>&quot;Colar HTML&quot;</strong> no formulário de notas.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-400 space-y-2 opacity-60">
                 <p className="font-semibold text-white flex items-center gap-1.5">
                   <Globe className="w-4 h-4 text-primary" />
-                  Como funciona o Scraping SEFAZ no PWA?
+                  Como funcionava o Scraping SEFAZ no PWA?
                 </p>
                 <p>
                   Servidores estaduais da SEFAZ bloqueiam requisições diretas de
-                  navegadores por restrições de CORS. O Church Manager utiliza um proxy
-                  seguro para obter o HTML do DANFE diretamente no seu aparelho.
+                  navegadores por restrições de CORS. O Church Manager utilizava um proxy
+                  para obter o HTML do DANFE diretamente no seu aparelho.
                 </p>
               </div>
 
