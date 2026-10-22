@@ -11,6 +11,7 @@ import {
 import { useNetworkStore } from '@/stores/use-network-store';
 import { useChurchSettingsStore } from '@/stores/use-church-settings-store';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
+import { SyncTriggerButton } from '@/components/sync/sync-trigger-button';
 
 interface HeaderProps {
   activeTab?: 'dashboard' | 'new-invoice';
@@ -127,6 +128,9 @@ export const Header: React.FC<HeaderProps> = ({
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
               <span>IndexedDB</span>
             </div>
+
+            {/* Sincronização P2P (Rede Local) */}
+            <SyncTriggerButton />
 
             {/* Botão de Configurações da Igreja */}
             <button

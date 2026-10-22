@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/header';
 import { useNetworkStore } from '@/stores/use-network-store';
 import { DashboardView } from '@/views/dashboard-view';
 import { NewInvoiceView } from '@/views/new-invoice-view';
+import { P2PSyncDialog } from '@/components/sync/p2p-sync-dialog';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'new-invoice'>('dashboard');
@@ -35,6 +36,9 @@ export const App: React.FC = () => {
           />
         )}
       </main>
+
+      {/* Modal Global de Sincronização P2P */}
+      <P2PSyncDialog />
 
       <footer className="hidden sm:block border-t border-slate-900/80 py-6 text-center text-xs text-slate-500">
         Church Manager • Módulo Fiscal PWA Offline-First • {new Date().getFullYear()}

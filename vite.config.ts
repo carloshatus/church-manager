@@ -77,6 +77,9 @@ export default defineConfig({
           if (id.includes('node_modules/jsqr')) {
             return 'vendor-scanner';
           }
+          if (id.includes('node_modules/peerjs') || id.includes('node_modules/qrcode')) {
+            return 'vendor-p2p';
+          }
         }
       }
     }

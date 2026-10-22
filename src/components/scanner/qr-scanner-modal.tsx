@@ -30,6 +30,7 @@ interface QrScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (decodedText: string) => void;
+  title?: string;
 }
 
 interface BarcodeResult {
@@ -53,6 +54,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   isOpen,
   onClose,
   onScanSuccess,
+  title,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -679,7 +681,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       <div className="w-full flex items-center justify-between max-w-md pt-1 px-1">
         <div className="flex items-center gap-2 text-white font-medium">
           <Camera className="w-5 h-5 text-primary animate-pulse" />
-          <span className="text-sm font-semibold">Leitor de QR Code Fiscal</span>
+          <span className="text-sm font-semibold">{title || 'Leitor de QR Code Fiscal'}</span>
           {activeResolution && (
             <span
               className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"

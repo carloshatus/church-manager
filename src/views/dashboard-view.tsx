@@ -9,6 +9,7 @@ import { FiltersBar, type FilterState } from '@/components/dashboard/filters-bar
 import { InvoiceDetailsDialog } from '@/components/invoices/invoice-details-dialog';
 import { EditInvoiceDialog } from '@/components/invoices/edit-invoice-dialog';
 import { PlusCircle, FileQuestion } from 'lucide-react';
+import { SyncTriggerButton } from '@/components/sync/sync-trigger-button';
 
 interface DashboardViewProps {
   onNavigateToNewInvoice: () => void;
@@ -80,14 +81,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onNavigateToNewInvoice}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition active:scale-95"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Nova Nota Fiscal
-        </button>
+        <div className="flex items-center gap-2.5">
+          <SyncTriggerButton variant="prominent" />
+          <button
+            type="button"
+            onClick={onNavigateToNewInvoice}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition active:scale-95"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Nova Nota Fiscal
+          </button>
+        </div>
       </div>
 
       {/* Cards de Métricas Financeiras e Sincronização */}
