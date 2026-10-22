@@ -97,6 +97,7 @@ export type P2PMessage =
 export interface SyncProgress {
   phase:
     | 'IDLE'
+    | 'CONNECTING'
     | 'HANDSHAKE'
     | 'DIFFING'
     | 'SENDING_DATA'
