@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { SefazScraperService } from '@/adapters/sefaz/sefaz-scraper.service';
+import {
+  SefazScraperService,
+  sefazScraperService,
+} from '@/adapters/sefaz/sefaz-scraper.service';
 
 const sampleBaHtml = `
 <div class="txtCenter">
@@ -97,6 +100,35 @@ describe('Adapters: SefazScraperService (Orquestrador de Scraping com Proxy CORS
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it('deve bloquear chamadas remotas e lançar erro amigável quando enabled for false', async () => {
+    const disabledScraper = new SefazScraperService({ enabled: false });
+    expect(disabledScraper.isSearchEnabled()).toBe(false);
+
+    const baUrl =
+      'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx?p=29260944053985000199650010000661511323710790|2|1|1|HASH';
+
+    await expect(disabledScraper.scrapeByQrCodeUrl(baUrl)).rejects.toThrow(
+      'A busca online na SEFAZ via proxy está temporariamente desativada.'
+    );
+
+    await expect(
+      disabledScraper.scrapeByAccessKey(
+        '29260944053985000199650010000661511323710790',
+        'BA'
+      )
+    ).rejects.toThrow(
+      'A busca online na SEFAZ via proxy está temporariamente desativada.'
+    );
+
+    // Permite reativar dinamicamente caso necessário
+    disabledScraper.setEnabled(true);
+    expect(disabledScraper.isSearchEnabled()).toBe(true);
+  });
+
+  it('deve ter a busca desativada por padrão na instância singleton sefazScraperService', () => {
+    expect(sefazScraperService.isSearchEnabled()).toBe(false);
   });
 });
 

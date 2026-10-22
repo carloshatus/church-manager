@@ -6,6 +6,7 @@ export interface SefazScraperOptions {
   corsProxyUrl?: string;
   fetchFn?: typeof fetch;
   timeoutMs?: number;
+  enabled?: boolean;
 }
 
 /**
@@ -17,6 +18,7 @@ export class SefazScraperService implements ISefazScraper {
   private defaultCorsProxyUrl: string;
   private fetchFn: typeof fetch;
   private defaultTimeoutMs: number;
+  private enabled: boolean;
 
   constructor(options: SefazScraperOptions = {}) {
     // Por padrão, utiliza AllOrigins Raw ou proxy configurado
@@ -26,6 +28,21 @@ export class SefazScraperService implements ISefazScraper {
       ? options.fetchFn.bind(globalThis)
       : (...args: Parameters<typeof fetch>) => globalThis.fetch(...args);
     this.defaultTimeoutMs = options.timeoutMs ?? 12000;
+    this.enabled = options.enabled ?? true;
+  }
+
+  /**
+   * Indica se a busca remota na SEFAZ está habilitada.
+   */
+  isSearchEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /**
+   * Permite alterar o estado de ativação da busca na SEFAZ em tempo de execução.
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
   }
 
   /**
@@ -94,6 +111,12 @@ export class SefazScraperService implements ISefazScraper {
     qrCodeUrl: string,
     corsProxyUrl?: string
   ): Promise<SefazScrapeResult> {
+    if (!this.enabled) {
+      throw new Error(
+        'A busca online na SEFAZ via proxy está temporariamente desativada.'
+      );
+    }
+
     const trimmedUrl = qrCodeUrl.trim();
     if (!trimmedUrl) {
       throw new Error('A URL do QR Code da SEFAZ não pode ser vazia.');
@@ -159,6 +182,12 @@ export class SefazScraperService implements ISefazScraper {
     uf: string,
     corsProxyUrl?: string
   ): Promise<SefazScrapeResult> {
+    if (!this.enabled) {
+      throw new Error(
+        'A busca online na SEFAZ via proxy está temporariamente desativada.'
+      );
+    }
+
     const cleanKey = accessKey.replace(/\D/g, '');
     if (cleanKey.length !== 44) {
       throw new Error('A chave de acesso deve ter exatamente 44 dígitos.');
@@ -183,4 +212,7 @@ export class SefazScraperService implements ISefazScraper {
   }
 }
 
-export const sefazScraperService = new SefazScraperService();
+// Instância singleton padrão com busca online desativada temporariamente (proxies instáveis)
+export const sefazScraperService = new SefazScraperService({
+  enabled: false,
+});
