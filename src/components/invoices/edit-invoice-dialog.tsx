@@ -38,7 +38,7 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
   const [issuerCnpj, setIssuerCnpj] = useState(invoice.issuerCnpj || '');
   const [issuerName, setIssuerName] = useState(invoice.issuerName || '');
   const [totalAmount, setTotalAmount] = useState(
-    invoice.totalAmount !== undefined
+    typeof invoice.totalAmount === 'number' && !isNaN(invoice.totalAmount)
       ? invoice.totalAmount.toString().replace('.', ',')
       : ''
   );
@@ -55,10 +55,16 @@ const EditInvoiceForm: React.FC<EditInvoiceFormProps> = ({
   );
 
   // Gestão de foto com Blob nativo e ObjectURL com prevenção de vazamento
-  const [currentBlob, setCurrentBlob] = useState<Blob | null>(invoice.imageBlob || null);
+  const [currentBlob, setCurrentBlob] = useState<Blob | null>(
+    invoice.imageBlob instanceof Blob ? invoice.imageBlob : null
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(() => {
-    if (invoice.imageBlob) {
-      return URL.createObjectURL(invoice.imageBlob);
+    if (invoice.imageBlob && invoice.imageBlob instanceof Blob) {
+      try {
+        return URL.createObjectURL(invoice.imageBlob);
+      } catch {
+        return null;
+      }
     }
     return null;
   });

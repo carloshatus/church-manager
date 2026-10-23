@@ -19,7 +19,10 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
     );
   }
 
-  const totalCalculated = items.reduce((acc, item) => acc + (item.totalPrice || 0), 0);
+  const totalCalculated = items.reduce(
+    (acc, item) => acc + (typeof item.totalPrice === 'number' && !isNaN(item.totalPrice) ? item.totalPrice : 0),
+    0
+  );
 
   return (
     <div className={`space-y-2.5 ${className}`}>
@@ -30,7 +33,9 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
         </span>
         <span className="text-xs font-mono text-slate-400">
           Soma dos itens: R${' '}
-          {totalCalculated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          {typeof totalCalculated === 'number' && !isNaN(totalCalculated)
+            ? totalCalculated.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+            : '0,00'}
         </span>
       </div>
 
@@ -54,7 +59,7 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
               >
                 <td className="px-3.5 py-2 text-slate-500 text-[11px]">{index + 1}</td>
                 <td className="px-3.5 py-2 font-sans font-medium text-slate-100">
-                  <div>{item.description}</div>
+                  <div>{item.description || 'Produto sem descrição'}</div>
                   {item.code && (
                     <span className="text-[10px] text-slate-500 font-mono">
                       Cód: {item.code}
@@ -62,22 +67,28 @@ export const InvoiceItemsTable: React.FC<InvoiceItemsTableProps> = ({
                   )}
                 </td>
                 <td className="px-3.5 py-2 text-center text-slate-300">
-                  {item.quantity.toLocaleString('pt-BR')}
+                  {typeof item.quantity === 'number' && !isNaN(item.quantity)
+                    ? item.quantity.toLocaleString('pt-BR')
+                    : (item.quantity ?? '-')}
                 </td>
                 <td className="px-3.5 py-2 text-center text-slate-400 text-[11px]">
                   {item.unit || 'UN'}
                 </td>
                 <td className="px-3.5 py-2 text-right text-slate-300">
                   R${' '}
-                  {item.unitPrice.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                  })}
+                  {typeof item.unitPrice === 'number' && !isNaN(item.unitPrice)
+                    ? item.unitPrice.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                      })
+                    : '0,00'}
                 </td>
                 <td className="px-3.5 py-2 text-right font-semibold text-emerald-400">
                   R${' '}
-                  {item.totalPrice.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                  })}
+                  {typeof item.totalPrice === 'number' && !isNaN(item.totalPrice)
+                    ? item.totalPrice.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                      })
+                    : '0,00'}
                 </td>
               </tr>
             ))}

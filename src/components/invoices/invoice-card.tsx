@@ -22,8 +22,12 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const thumbnailUrl = useMemo(() => {
-    if (!invoice.imageBlob) return null;
-    return URL.createObjectURL(invoice.imageBlob);
+    if (!invoice.imageBlob || !(invoice.imageBlob instanceof Blob)) return null;
+    try {
+      return URL.createObjectURL(invoice.imageBlob);
+    } catch {
+      return null;
+    }
   }, [invoice.imageBlob]);
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export const InvoiceCard: React.FC<InvoiceCardProps> = ({
               {invoice.emissionDate}
             </span>
           )}
-          {invoice.totalAmount !== undefined && (
+          {typeof invoice.totalAmount === 'number' && !isNaN(invoice.totalAmount) && (
             <span className="font-semibold text-emerald-400 flex items-center gap-0.5 text-sm">
               R${' '}
               {invoice.totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

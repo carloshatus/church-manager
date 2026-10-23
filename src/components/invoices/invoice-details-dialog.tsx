@@ -31,9 +31,15 @@ interface InvoiceDetailsDialogProps {
   onEditInvoice?: (invoice: Invoice) => void;
 }
 
-export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
+interface InvoiceDetailsDialogContentProps {
+  invoice: Invoice;
+  onClose: () => void;
+  onInvoiceUpdated?: () => void;
+  onEditInvoice?: (invoice: Invoice) => void;
+}
+
+const InvoiceDetailsDialogContent: React.FC<InvoiceDetailsDialogContentProps> = ({
   invoice: initialInvoice,
-  isOpen,
   onClose,
   onInvoiceUpdated,
   onEditInvoice,
@@ -44,12 +50,16 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
   const [isScrapingSefaz, setIsScrapingSefaz] = useState(false);
   const [sefazScrapeError, setSefazScrapeError] = useState<string | null>(null);
 
-  const invoice = initialInvoice ? { ...initialInvoice, ...overrides } : null;
+  const invoice = { ...initialInvoice, ...overrides };
 
   const imageBlob = invoice?.imageBlob;
   const photoUrl = useMemo(() => {
-    if (!imageBlob) return null;
-    return URL.createObjectURL(imageBlob);
+    if (!imageBlob || !(imageBlob instanceof Blob)) return null;
+    try {
+      return URL.createObjectURL(imageBlob);
+    } catch {
+      return null;
+    }
   }, [imageBlob]);
 
   useEffect(() => {
@@ -59,8 +69,6 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
       }
     };
   }, [photoUrl]);
-
-  if (!isOpen || !invoice) return null;
 
   const handleCopyKey = async () => {
     await navigator.clipboard.writeText(invoice.accessKey);
@@ -237,7 +245,7 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
         {/* Protocolo, Pagamento e Tributos */}
         {(invoice.protocol ||
           invoice.paymentMethod ||
-          invoice.taxAmount !== undefined) && (
+          (typeof invoice.taxAmount === 'number' && !isNaN(invoice.taxAmount))) && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             {invoice.protocol && (
               <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
@@ -263,7 +271,7 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
               </div>
             )}
 
-            {invoice.taxAmount !== undefined && (
+            {typeof invoice.taxAmount === 'number' && !isNaN(invoice.taxAmount) && (
               <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-3">
                 <span className="text-slate-500 block mb-0.5">Tributos Totais</span>
                 <span className="font-semibold text-slate-200">
@@ -278,7 +286,7 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
         )}
 
         {/* Valor Total */}
-        {invoice.totalAmount !== undefined && (
+        {typeof invoice.totalAmount === 'number' && !isNaN(invoice.totalAmount) && (
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4 flex items-center justify-between">
             <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
               Valor Total Registrado
@@ -360,7 +368,10 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
         {/* Rodapé com Ação de Alternar Status de Sincronização */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/80 pt-4 text-xs text-slate-500">
           <span>
-            Cadastrado em: {new Date(invoice.createdAt).toLocaleString('pt-BR')}
+            Cadastrado em:{' '}
+            {invoice.createdAt
+              ? new Date(invoice.createdAt).toLocaleString('pt-BR')
+              : 'Data não informada'}
           </span>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -395,5 +406,25 @@ export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
         </div>
       </div>
     </div>
+  );
+};
+
+export const InvoiceDetailsDialog: React.FC<InvoiceDetailsDialogProps> = ({
+  isOpen,
+  invoice,
+  onClose,
+  onInvoiceUpdated,
+  onEditInvoice,
+}) => {
+  if (!isOpen || !invoice) return null;
+
+  return (
+    <InvoiceDetailsDialogContent
+      key={invoice.id ?? invoice.accessKey}
+      invoice={invoice}
+      onClose={onClose}
+      onInvoiceUpdated={onInvoiceUpdated}
+      onEditInvoice={onEditInvoice}
+    />
   );
 };
