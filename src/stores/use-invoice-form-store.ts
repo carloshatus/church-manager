@@ -242,7 +242,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
         if (result.issuerAddress) {
           nextFields.issuerAddress = result.issuerAddress;
         }
-        if (result.totalAmount !== undefined) {
+        if (typeof result.totalAmount === 'number' && !isNaN(result.totalAmount)) {
           nextFields.totalAmount = result.totalAmount.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -263,7 +263,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
         if (result.paymentMethod) {
           nextFields.paymentMethod = result.paymentMethod;
         }
-        if (result.taxAmount !== undefined) {
+        if (typeof result.taxAmount === 'number' && !isNaN(result.taxAmount)) {
           nextFields.taxAmount = result.taxAmount.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -304,7 +304,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
         if (result.issuerName) nextFields.issuerName = result.issuerName;
         if (result.issuerCnpj) nextFields.issuerCnpj = result.issuerCnpj;
         if (result.issuerAddress) nextFields.issuerAddress = result.issuerAddress;
-        if (result.totalAmount !== undefined) {
+        if (typeof result.totalAmount === 'number' && !isNaN(result.totalAmount)) {
           nextFields.totalAmount = result.totalAmount.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -316,7 +316,7 @@ export const useInvoiceFormStore = create<InvoiceFormState>((set, get) => ({
           nextFields.recipientCpfCnpj = result.recipientCpfCnpj;
         if (result.recipientName) nextFields.recipientName = result.recipientName;
         if (result.paymentMethod) nextFields.paymentMethod = result.paymentMethod;
-        if (result.taxAmount !== undefined) {
+        if (typeof result.taxAmount === 'number' && !isNaN(result.taxAmount)) {
           nextFields.taxAmount = result.taxAmount.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
